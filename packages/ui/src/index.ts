@@ -9,6 +9,7 @@ export * from './components/file-upload.js';
 export * from './components/filter-bar.js';
 export * from './components/form-field.js';
 export * from './components/form-layout.js';
+export * from './components/layout-primitives.js';
 export * from './components/line-item-grid.js';
 export * from './components/money-text.js';
 export * from './components/number-input.js';

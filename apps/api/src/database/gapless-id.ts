@@ -17,7 +17,13 @@ import type { Prisma, PrismaClient } from '../generated/prisma/client.js';
  *
  * When a new table is added, add its table name to GAPLESS_TABLES.
  */
-export const GAPLESS_TABLES = ['organizations', 'users'] as const;
+export const GAPLESS_TABLES = [
+  'organizations',
+  'roles',
+  'permissions',
+  'users',
+  'audit_logs',
+] as const;
 
 export type GaplessTable = (typeof GAPLESS_TABLES)[number];
 

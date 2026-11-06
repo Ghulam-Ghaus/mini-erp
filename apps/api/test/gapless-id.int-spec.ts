@@ -13,11 +13,28 @@ function createOrg(name: string) {
   });
 }
 
-function createUser(organizationId: number, username: string) {
+function createRole(organizationId: number, code: string) {
+  return inTransaction(prisma, async (tx) => {
+    const id = await nextId(tx, 'roles');
+    return tx.role.create({
+      data: { id, organizationId, code, name: code, isSystem: true },
+    });
+  });
+}
+
+function createUser(organizationId: number, roleId: number, username: string) {
   return inTransaction(prisma, async (tx) => {
     const id = await nextId(tx, 'users');
     return tx.user.create({
-      data: { id, organizationId, username, firstName: 'Test', lastName: 'User', pinHash: 'x' },
+      data: {
+        id,
+        organizationId,
+        roleId,
+        username,
+        firstName: 'Test',
+        lastName: 'User',
+        pinHash: 'x',
+      },
     });
   });
 }
@@ -30,7 +47,9 @@ beforeAll(() => {
 
 beforeEach(async () => {
   // Test database only (guarded by requireTestDatabaseUrl).
-  await prisma.$executeRawUnsafe('TRUNCATE TABLE "users", "organizations", "id_counters"');
+  await prisma.$executeRawUnsafe(
+    'TRUNCATE TABLE "audit_logs", "role_permissions", "permissions", "users", "roles", "organizations", "id_counters" CASCADE',
+  );
 });
 
 afterAll(async () => {
@@ -61,9 +80,10 @@ describe('gapless ids (integration)', () => {
 
   it('reuses the number when a database constraint fails', async () => {
     const org = await createOrg('A');
-    expect((await createUser(org.id, 'ali')).id).toBe(1);
-    await expect(createUser(org.id, 'ali')).rejects.toThrow(); // duplicate username
-    expect((await createUser(org.id, 'sara')).id).toBe(2);
+    const role = await createRole(org.id, 'ADMIN');
+    expect((await createUser(org.id, role.id, 'ali')).id).toBe(1);
+    await expect(createUser(org.id, role.id, 'ali')).rejects.toThrow(); // duplicate username
+    expect((await createUser(org.id, role.id, 'sara')).id).toBe(2);
   });
 
   it('gives contiguous ids to concurrent inserts', async () => {
@@ -75,6 +95,7 @@ describe('gapless ids (integration)', () => {
   it('keeps a separate counter per table', async () => {
     const org = await createOrg('A');
     await createOrg('B');
-    expect((await createUser(org.id, 'ali')).id).toBe(1);
+    const role = await createRole(org.id, 'ADMIN');
+    expect((await createUser(org.id, role.id, 'ali')).id).toBe(1);
   });
 });

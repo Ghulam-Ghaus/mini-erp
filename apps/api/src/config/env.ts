@@ -18,6 +18,10 @@ const envSchema = z.object({
         .filter((origin) => origin.length > 0),
     ),
   APP_VERSION: z.string().default('0.0.0'),
+  JWT_SECRET: z
+    .string()
+    .min(16, 'JWT_SECRET must be at least 16 characters')
+    .default('mini-erp-dev-jwt-secret-change-in-prod'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
