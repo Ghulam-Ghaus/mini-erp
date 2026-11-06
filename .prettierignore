@@ -1,0 +1,12 @@
+node_modules
+dist
+release
+coverage
+.turbo
+pnpm-lock.yaml
+apps/api/src/generated
+prisma/migrations
+AGENTS.md
+PROJECT_START.md
+ANTIGRAVITY_TIPS.md
+

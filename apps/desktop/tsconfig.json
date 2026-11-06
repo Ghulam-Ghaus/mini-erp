@@ -1,0 +1,8 @@
+{
+  "extends": "@mini-erp/config/tsconfig/node.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["src", "*.ts"]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "envMode": "loose",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "@mini-erp/api#dev": {
+      "dependsOn": ["^build", "build"],
+      "cache": false,
+      "persistent": true
+    },
+    "@mini-erp/desktop#dev": {
+      "dependsOn": ["^build", "@mini-erp/api#build"],
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "cache": false
+    }
+  }
+}

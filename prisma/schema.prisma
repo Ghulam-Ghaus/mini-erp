@@ -1,0 +1,66 @@
+// Database schema. Conventions:
+// - Tables and columns are snake_case (@@map / @map).
+// - Primary keys are gapless integers: NO @default(autoincrement()).
+//   Every insert must take its id from `id_counters` inside the same transaction
+//   (see apps/api/src/database/gapless-id.ts). A missing id fails the insert.
+// - Money: Decimal(14,2). Quantities in base unit (kg): Decimal(12,3). Never Float.
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../apps/api/src/generated/prisma"
+  moduleFormat           = "esm"
+  importFileExtension    = "js"
+  generatedFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Gapless id counters, one row per table. Incremented inside the inserting
+/// transaction, so a failed insert rolls the counter back and no number is skipped.
+model IdCounter {
+  tableName String @id @map("table_name")
+  lastValue Int    @map("last_value")
+
+  @@map("id_counters")
+}
+
+model Organization {
+  id           Int      @id
+  name         String
+  nameUr       String?  @map("name_ur")
+  logoPath     String?  @map("logo_path")
+  address      String?
+  phone        String?
+  email        String?
+  taxNo        String?  @map("tax_no")
+  currency     String   @default("PKR")
+  dateFormat   String   @default("DD/MM/YYYY") @map("date_format")
+  settingsJson Json     @default("{}") @map("settings_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  username       String    @unique
+  pinHash        String    @map("pin_hash")
+  isActive       Boolean   @default(true) @map("is_active")
+  lastLoginAt    DateTime? @map("last_login_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@map("users")
+}
+

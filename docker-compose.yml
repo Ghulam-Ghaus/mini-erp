@@ -1,0 +1,25 @@
+# Development database only. Production uses a bundled PostgreSQL (Phase 12).
+name: mini-erp
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: mini-erp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mini_erp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mini_erp_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-mini_erp}
+    ports:
+      - '${POSTGRES_PORT:-5434}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./prisma/dev/init-test-db.sql:/docker-entrypoint-initdb.d/01-init-test-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-mini_erp} -d ${POSTGRES_DB:-mini_erp}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -1,0 +1,77 @@
+/* Calm, neutral, Claude-desktop-like theme tokens (Section 10 of PROJECT_START.md) */
+:root {
+  --erp-bg-canvas: #f7f6f2;
+  --erp-bg-sidebar: #f1efe9;
+  --erp-bg-surface: #ffffff;
+  --erp-bg-subtle: #faf9f5;
+  --erp-bg-hover: #eae8e1;
+  --erp-bg-active: #e2dfd6;
+
+  --erp-border: #e4e2da;
+  --erp-border-strong: #cfccc2;
+
+  --erp-text-primary: #1f1e1b;
+  --erp-text-secondary: #5c5a53;
+  --erp-text-muted: #8c8980;
+
+  --erp-accent: #2c2b28;
+  --erp-accent-hover: #181715;
+  --erp-accent-fg: #ffffff;
+
+  --erp-danger: #9e3b33;
+  --erp-danger-bg: #fbf2f1;
+  --erp-danger-border: #ead0cd;
+
+  --erp-success: #2c6b48;
+  --erp-success-bg: #f1f8f4;
+  --erp-success-border: #cce3d5;
+
+  --erp-warning: #8f5f1a;
+  --erp-warning-bg: #fcf7ee;
+  --erp-warning-border: #ead8b8;
+
+  --erp-info: #2d5a7b;
+  --erp-info-bg: #f1f6fa;
+  --erp-info-border: #c9dceb;
+
+  --erp-font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Nastaliq Urdu',
+    'Jameel Noori Nastaleeq', sans-serif;
+  --erp-font-urdu: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Inter', sans-serif;
+  --erp-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+html {
+  font-size: 14px;
+  font-family: var(--erp-font-sans);
+  background-color: var(--erp-bg-canvas);
+  color: var(--erp-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+html[dir='rtl'] {
+  font-family: var(--erp-font-urdu);
+}
+
+/* Tabular right-aligned numbers for money & weights */
+.erp-num {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--erp-font-sans);
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Thin, calm scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--erp-border-strong);
+  border-radius: 3px;
+}

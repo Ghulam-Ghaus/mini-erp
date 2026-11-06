@@ -1,0 +1,26 @@
+{
+  "name": "@mini-erp/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json && wait-on -t 180000 tcp:127.0.0.1:5173 && electron .",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mini-erp/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@mini-erp/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "electron": "^35.0.0",
+    "eslint": "^9.20.0",
+    "typescript": "6.0.3",
+    "vitest": "^3.0.0",
+    "wait-on": "^8.0.0"
+  }
+}

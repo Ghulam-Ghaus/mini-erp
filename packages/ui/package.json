@@ -1,0 +1,36 @@
+{
+  "name": "@mini-erp/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mini-erp/shared": "workspace:*",
+    "@tanstack/react-table": "^8.21.2",
+    "decimal.js": "^10.5.0",
+    "lucide-react": "^0.475.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@mini-erp/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.20.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "6.0.3",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@mini-erp/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "decimal.js": "^10.5.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@mini-erp/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.20.0",
+    "typescript": "6.0.3",
+    "vitest": "^3.0.0"
+  }
+}
