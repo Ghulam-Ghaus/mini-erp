@@ -34,10 +34,22 @@ import {
   setStoredToken,
 } from './lib/api.js';
 import { DashboardScreen } from './screens/dashboard-screen.js';
-import { DemoShowcaseScreen } from './screens/demo-showcase-screen.js';
+import { BatchesScreen } from './screens/batches-screen.js';
+import { Client360Screen } from './screens/client-360-screen.js';
+import { ClientsScreen } from './screens/clients-screen.js';
+import { InventoryScreen } from './screens/inventory-screen.js';
+import { ItemsScreen } from './screens/items-screen.js';
 import { LockScreen, LoginScreen } from './screens/login-screen.js';
+import { PaymentsOutScreen } from './screens/payments-out-screen.js';
+import { PurchaseInvoicesScreen } from './screens/purchase-invoices-screen.js';
+import { PurchaseReturnsScreen } from './screens/purchase-returns-screen.js';
+import { RoutesScreen } from './screens/routes-screen.js';
+import { SaleReturnsScreen } from './screens/sale-returns-screen.js';
+import { SalesInvoicesScreen } from './screens/sales-invoices-screen.js';
 import { SettingsScreen } from './screens/settings-screen.js';
 import { SetupWizardScreen } from './screens/setup-wizard-screen.js';
+import { SupplierLedgerScreen } from './screens/supplier-ledger-screen.js';
+import { SuppliersScreen } from './screens/suppliers-screen.js';
 import { UsersRolesScreen } from './screens/users-roles-screen.js';
 
 function DotIcon() {
@@ -55,6 +67,22 @@ function RootApplication() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [changePinOpen, setChangePinOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  // Cross-screen 360° drill-down & prefill state
+  const [selectedSupplierIdFor360, setSelectedSupplierIdFor360] = useState<number | null>(null);
+  const [prefillSupplierForPurchase, setPrefillSupplierForPurchase] = useState<number | null>(null);
+  const [inspectPurchaseId, setInspectPurchaseId] = useState<number | null>(null);
+  const [inspectBatchId, setInspectBatchId] = useState<number | null>(null);
+  const [prefillPurchaseForReturn, setPrefillPurchaseForReturn] = useState<number | null>(null);
+  const [prefillPaymentContext, setPrefillPaymentContext] = useState<{
+    supplierId: number;
+    purchaseId?: number;
+  } | null>(null);
+
+  const [selectedClientIdFor360, setSelectedClientIdFor360] = useState<number | null>(null);
+  const [prefillClientForSale, setPrefillClientForSale] = useState<number | null>(null);
+  const [inspectSaleId, setInspectSaleId] = useState<number | null>(null);
+  const [prefillSaleForReturn, setPrefillSaleForReturn] = useState<number | null>(null);
 
   const health = useQuery({
     queryKey: ['health'],
@@ -220,6 +248,7 @@ function RootApplication() {
       items.push({ id: 'batches', label: t('nav.batches'), icon: <DotIcon /> });
     }
     if (can('inventory', 'view')) {
+      items.push({ id: 'items', label: t('nav.items'), icon: <DotIcon /> });
       items.push({ id: 'inventory', label: t('nav.inventory'), icon: <DotIcon /> });
     }
     if (can('clients', 'view')) {
@@ -409,8 +438,198 @@ function RootApplication() {
             });
           }}
         />
-      ) : activeNavId === 'sales-invoices' ? (
-        <DemoShowcaseScreen />
+      ) : activeNavId === 'items' && can('inventory', 'view') ? (
+        <ItemsScreen canCreate={can('inventory', 'create')} canEdit={can('inventory', 'edit')} />
+      ) : activeNavId === 'batches' && can('batches', 'view') ? (
+        <BatchesScreen
+          canCreate={can('batches', 'create')}
+          canEdit={can('batches', 'edit')}
+          inspectBatchId={inspectBatchId}
+          onClearInspect={() => setInspectBatchId(null)}
+          onOpenSupplier360={(supId) => {
+            setSelectedSupplierIdFor360(supId);
+            setActiveNavId('supplier-ledger');
+          }}
+          onOpenPurchaseDetail={(purId) => {
+            setInspectPurchaseId(purId);
+            setActiveNavId('purchase-invoices');
+          }}
+        />
+      ) : activeNavId === 'inventory' && can('inventory', 'view') ? (
+        <InventoryScreen
+          onOpenBatch360={(bId) => {
+            setInspectBatchId(bId);
+            setActiveNavId('batches');
+          }}
+        />
+      ) : (activeNavId === 'suppliers' || activeNavId === 'supplier-list') &&
+        can('suppliers', 'view') ? (
+        <SuppliersScreen
+          canCreate={can('suppliers', 'create')}
+          canEdit={can('suppliers', 'edit')}
+          canPay={can('payments', 'create')}
+          canPurchase={can('purchases', 'create')}
+          onOpenSupplier360={(supId) => {
+            setSelectedSupplierIdFor360(supId);
+            setActiveNavId('supplier-ledger');
+          }}
+          onRecordPaymentForSupplier={(supId) => {
+            setPrefillPaymentContext({ supplierId: supId });
+            setActiveNavId('payments-cheques');
+          }}
+          onNewPurchaseForSupplier={(supId) => {
+            setPrefillSupplierForPurchase(supId);
+            setActiveNavId('purchase-invoices');
+          }}
+        />
+      ) : activeNavId === 'supplier-ledger' && can('suppliers', 'view') ? (
+        <SupplierLedgerScreen
+          initialSupplierId={selectedSupplierIdFor360}
+          canPay={can('payments', 'create')}
+          canPurchase={can('purchases', 'create')}
+          onRecordPayment={(supId, purId) => {
+            setPrefillPaymentContext({ supplierId: supId, purchaseId: purId });
+            setActiveNavId('payments-cheques');
+          }}
+          onNewPurchase={(supId) => {
+            setPrefillSupplierForPurchase(supId);
+            setActiveNavId('purchase-invoices');
+          }}
+          onViewPurchaseInvoice={(purId) => {
+            setInspectPurchaseId(purId);
+            setActiveNavId('purchase-invoices');
+          }}
+        />
+      ) : (activeNavId === 'purchases' || activeNavId === 'purchase-invoices') &&
+        can('purchases', 'view') ? (
+        <PurchaseInvoicesScreen
+          canCreate={can('purchases', 'create')}
+          canVoid={can('purchases', 'delete')}
+          canPay={can('payments', 'create')}
+          canReturn={can('purchases', 'create')}
+          taxEnabled={session.organization.settings.taxEnabled}
+          defaultTaxRate={session.organization.settings.defaultTaxRate}
+          prefillSupplierId={prefillSupplierForPurchase}
+          inspectPurchaseId={inspectPurchaseId}
+          onClearPrefill={() => {
+            setPrefillSupplierForPurchase(null);
+            setInspectPurchaseId(null);
+          }}
+          onOpenSupplier360={(supId) => {
+            setSelectedSupplierIdFor360(supId);
+            setActiveNavId('supplier-ledger');
+          }}
+          onRecordPayment={(supId, purId) => {
+            setPrefillPaymentContext({ supplierId: supId, purchaseId: purId });
+            setActiveNavId('payments-cheques');
+          }}
+          onCreateReturnFromPurchase={(purId) => {
+            setPrefillPurchaseForReturn(purId);
+            setActiveNavId('purchase-returns');
+          }}
+        />
+      ) : activeNavId === 'purchase-returns' && can('purchases', 'view') ? (
+        <PurchaseReturnsScreen
+          canCreate={can('purchases', 'create')}
+          prefillPurchaseId={prefillPurchaseForReturn}
+          onClearPrefill={() => setPrefillPurchaseForReturn(null)}
+          onOpenSupplier360={(supId) => {
+            setSelectedSupplierIdFor360(supId);
+            setActiveNavId('supplier-ledger');
+          }}
+          onViewPurchaseInvoice={(purId) => {
+            setInspectPurchaseId(purId);
+            setActiveNavId('purchase-invoices');
+          }}
+        />
+      ) : activeNavId === 'payments-cheques' && can('payments', 'view') ? (
+        <PaymentsOutScreen
+          canCreate={can('payments', 'create')}
+          canVoid={can('payments', 'delete')}
+          prefillSupplierId={prefillPaymentContext?.supplierId ?? null}
+          prefillPurchaseId={prefillPaymentContext?.purchaseId ?? null}
+          onClearPrefill={() => setPrefillPaymentContext(null)}
+          onOpenSupplier360={(supId) => {
+            setSelectedSupplierIdFor360(supId);
+            setActiveNavId('supplier-ledger');
+          }}
+          onViewPurchaseInvoice={(purId) => {
+            setInspectPurchaseId(purId);
+            setActiveNavId('purchase-invoices');
+          }}
+        />
+      ) : (activeNavId === 'sales' || activeNavId === 'sales-invoices') && can('sales', 'view') ? (
+        <SalesInvoicesScreen
+          canCreate={can('sales', 'create')}
+          canVoid={can('sales', 'delete')}
+          taxEnabled={session.organization.settings.taxEnabled}
+          defaultTaxRate={session.organization.settings.defaultTaxRate}
+          initialClientIdForNewSale={prefillClientForSale}
+          inspectSaleId={inspectSaleId}
+          onClearInitial={() => {
+            setPrefillClientForSale(null);
+            setInspectSaleId(null);
+          }}
+          onOpenClient360={(cId) => {
+            setSelectedClientIdFor360(cId);
+            setActiveNavId('client-ledger');
+          }}
+          onOpenBatchWorkspace={(bId) => {
+            setInspectBatchId(bId);
+            setActiveNavId('batches');
+          }}
+          onCreateCreditNote={(sId) => {
+            setPrefillSaleForReturn(sId);
+            setActiveNavId('sale-returns');
+          }}
+        />
+      ) : activeNavId === 'sale-returns' && can('returns', 'view') ? (
+        <SaleReturnsScreen
+          canCreate={can('returns', 'create')}
+          canVoid={can('returns', 'delete')}
+          initialSaleIdForReturn={prefillSaleForReturn}
+          onClearInitialSale={() => setPrefillSaleForReturn(null)}
+          onOpenClient360={(cId) => {
+            setSelectedClientIdFor360(cId);
+            setActiveNavId('client-ledger');
+          }}
+          onViewSaleInvoice={(sId) => {
+            setInspectSaleId(sId);
+            setActiveNavId('sales-invoices');
+          }}
+        />
+      ) : (activeNavId === 'clients' || activeNavId === 'client-list') && can('clients', 'view') ? (
+        <ClientsScreen
+          canCreate={can('clients', 'create')}
+          canEdit={can('clients', 'edit')}
+          onOpenClient360={(cId) => {
+            setSelectedClientIdFor360(cId);
+            setActiveNavId('client-ledger');
+          }}
+          onCreateSaleForClient={(cId) => {
+            setPrefillClientForSale(cId);
+            setActiveNavId('sales-invoices');
+          }}
+        />
+      ) : activeNavId === 'client-ledger' && can('clients', 'view') ? (
+        <Client360Screen
+          initialClientId={selectedClientIdFor360}
+          canCreateSale={can('sales', 'create')}
+          onNewSale={(cId) => {
+            setPrefillClientForSale(cId);
+            setActiveNavId('sales-invoices');
+          }}
+          onViewSaleInvoice={(sId) => {
+            setInspectSaleId(sId);
+            setActiveNavId('sales-invoices');
+          }}
+          onCreateCreditNote={(sId) => {
+            setPrefillSaleForReturn(sId);
+            setActiveNavId('sale-returns');
+          }}
+        />
+      ) : activeNavId === 'routes' && can('clients', 'view') ? (
+        <RoutesScreen canCreate={can('clients', 'create')} canEdit={can('clients', 'edit')} />
       ) : (
         <DashboardScreen
           orgName={displayOrgName}

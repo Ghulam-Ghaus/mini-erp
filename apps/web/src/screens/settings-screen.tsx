@@ -19,7 +19,7 @@ import {
 } from '@mini-erp/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { updateOrganization } from '../lib/api.js';
 
@@ -48,7 +48,7 @@ export function SettingsScreen({ organization, canEdit, onUpdated }: SettingsScr
   );
 
   const form = useForm<UpdateOrganizationInput>({
-    resolver: zodResolver(updateOrganizationSchema),
+    resolver: zodResolver(updateOrganizationSchema) as Resolver<UpdateOrganizationInput>,
     defaultValues: {
       name: organization.name,
       nameUr: organization.nameUr ?? '',

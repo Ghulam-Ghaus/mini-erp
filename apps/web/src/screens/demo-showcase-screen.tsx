@@ -7,6 +7,7 @@ import {
   DataTable,
   DatePicker,
   Drawer,
+  EntityLink,
   FileUpload,
   FilterBar,
   FormField,
@@ -17,6 +18,7 @@ import {
   NumberInput,
   PageHeader,
   Pagination,
+  RowActions,
   Select,
   StatusBadge,
   TextArea,
@@ -295,7 +297,20 @@ export function DemoShowcaseScreen() {
         id: 'invoiceNo',
         header: t('demo.columns.invoiceNo'),
         size: 130,
-        cell: ({ row }) => <span className="font-medium">{row.original.invoiceNo}</span>,
+        cell: ({ row }) => (
+          <EntityLink
+            mono
+            onClick={() =>
+              showToast({
+                title: `Invoice Detail: ${row.original.invoiceNo}`,
+                description: `${row.original.client} · ${row.original.item} (${row.original.qtyKg} kg)`,
+                tone: 'neutral',
+              })
+            }
+          >
+            {row.original.invoiceNo}
+          </EntityLink>
+        ),
       },
       {
         id: 'date',
@@ -307,13 +322,37 @@ export function DemoShowcaseScreen() {
         id: 'client',
         header: t('demo.columns.client'),
         size: 170,
-        cell: ({ row }) => row.original.client,
+        cell: ({ row }) => (
+          <EntityLink
+            onClick={() =>
+              showToast({
+                title: `Client 360° Ledger & Recovery: ${row.original.client}`,
+                description: 'Opens full client ledger, invoices, payments & recovery history',
+                tone: 'neutral',
+              })
+            }
+          >
+            {row.original.client}
+          </EntityLink>
+        ),
       },
       {
         id: 'batch',
         header: t('demo.columns.batch'),
         size: 95,
-        cell: ({ row }) => row.original.batch,
+        cell: ({ row }) => (
+          <EntityLink
+            onClick={() =>
+              showToast({
+                title: `Batch Costing & Stock: ${row.original.batch}`,
+                description: `Cost/kg: ${row.original.costRate}`,
+                tone: 'neutral',
+              })
+            }
+          >
+            {row.original.batch}
+          </EntityLink>
+        ),
       },
       {
         id: 'item',
@@ -377,8 +416,59 @@ export function DemoShowcaseScreen() {
           </StatusBadge>
         ),
       },
+      {
+        id: 'actions',
+        header: t('common.actions'),
+        size: 210,
+        enableSorting: false,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => (
+          <RowActions
+            actions={[
+              {
+                id: 'print-inv',
+                label: t('Invoice'),
+                inline: true,
+                onClick: () =>
+                  showToast({
+                    title: `Printing Invoice ${row.original.invoiceNo}`,
+                    tone: 'neutral',
+                  }),
+              },
+              {
+                id: 'print-challan',
+                label: 'Challan',
+                inline: true,
+                onClick: () =>
+                  showToast({
+                    title: `Printing Delivery Challan for ${row.original.invoiceNo}`,
+                    tone: 'neutral',
+                  }),
+              },
+              {
+                id: 'ledger',
+                label: 'Client Ledger (360°)',
+                onClick: () =>
+                  showToast({
+                    title: `Opening Client Ledger: ${row.original.client}`,
+                    tone: 'neutral',
+                  }),
+              },
+              {
+                id: 'return',
+                label: 'Create Sale Return',
+                onClick: () =>
+                  showToast({
+                    title: `Create Credit Note from ${row.original.invoiceNo}`,
+                    tone: 'neutral',
+                  }),
+              },
+            ]}
+          />
+        ),
+      },
     ],
-    [t, totals],
+    [t, totals, showToast],
   );
 
   const updateLine = (index: number, patch: Partial<DemoLineItem>) => {

@@ -18,7 +18,7 @@ import {
 } from '@mini-erp/ui';
 import { useMutation } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { initializeOrganization } from '../lib/api.js';
@@ -53,7 +53,7 @@ export function SetupWizardScreen({
   const [logoDataUrl, setLogoDataUrl] = useState<string | undefined>(undefined);
 
   const orgForm = useForm<OrgFormValues>({
-    resolver: zodResolver(setupOrganizationStepSchema),
+    resolver: zodResolver(setupOrganizationStepSchema) as Resolver<OrgFormValues>,
     defaultValues: {
       name: '',
       nameUr: '',

@@ -41,9 +41,23 @@ model Organization {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  roles     Role[]
-  users     User[]
-  auditLogs AuditLog[]
+  roles            Role[]
+  users            User[]
+  auditLogs        AuditLog[]
+  numberSequences  NumberSequence[]
+  suppliers        Supplier[]
+  items            Item[]
+  purchaseInvoices PurchaseInvoice[]
+  purchaseReturns  PurchaseReturn[]
+  batches          Batch[]
+  stockMovements   StockMovement[]
+  ledgerEntries    LedgerEntry[]
+  payments         Payment[]
+  attachments      Attachment[]
+  routes           Route[]
+  clients          Client[]
+  salesInvoices    SaleInvoice[]
+  saleReturns      SaleReturn[]
 
   @@map("organizations")
 }
@@ -105,6 +119,7 @@ model User {
   organization Organization @relation(fields: [organizationId], references: [id])
   role         Role         @relation(fields: [roleId], references: [id])
   auditLogs    AuditLog[]
+  assignedRoutes Route[]    @relation("OfficerRoutes")
 
   @@index([organizationId])
   @@index([roleId])
@@ -128,4 +143,595 @@ model AuditLog {
   @@index([organizationId, createdAt])
   @@index([entity, entityId])
   @@map("audit_logs")
+}
+
+model NumberSequence {
+  id             Int      @id
+  organizationId Int      @map("organization_id")
+  docType        String   @map("doc_type")
+  prefix         String
+  nextNo         Int      @default(1) @map("next_no")
+  year           Int
+  padding        Int      @default(4)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, docType, year])
+  @@index([organizationId])
+  @@map("number_sequences")
+}
+
+model Supplier {
+  id             Int      @id
+  organizationId Int      @map("organization_id")
+  code           String?
+  name           String
+  nameUr         String?  @map("name_ur")
+  contactPerson  String?  @map("contact_person")
+  phone          String?
+  address        String?
+  taxNo          String?  @map("tax_no")
+  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  notes          String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  purchaseInvoices PurchaseInvoice[]
+  purchaseReturns  PurchaseReturn[]
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, name])
+  @@map("suppliers")
+}
+
+model Item {
+  id             Int      @id
+  organizationId Int      @map("organization_id")
+  code           String?
+  name           String
+  nameUr         String?  @map("name_ur")
+  category       String?
+  baseUnit       String   @default("KG") @map("base_unit")
+  defaultTaxRate Decimal  @default(0) @map("default_tax_rate") @db.Decimal(5, 2)
+  notes          String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  alternateUnits ItemUnit[]
+  purchaseItems  PurchaseItem[]
+  batches        Batch[]
+  batchSources   BatchSource[]
+  stockMovements StockMovement[]
+  saleItems       SaleItem[]
+  saleReturnItems SaleReturnItem[]
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, name])
+  @@map("items")
+}
+
+model ItemUnit {
+  id                   Int      @id
+  itemId               Int      @map("item_id")
+  unitName             String   @map("unit_name")
+  unitNameUr           String?  @map("unit_name_ur")
+  conversionFactor     Decimal  @map("conversion_factor") @db.Decimal(12, 3)
+  isDefaultForPurchase Boolean  @default(false) @map("is_default_for_purchase")
+  isDefaultForSale     Boolean  @default(false) @map("is_default_for_sale")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, unitName])
+  @@index([itemId])
+  @@map("item_units")
+}
+
+model PurchaseInvoice {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  invoiceNo      String    @map("invoice_no")
+  supplierRefNo  String?   @map("supplier_ref_no")
+  invoiceDate    DateTime  @map("invoice_date")
+  supplierId     Int       @map("supplier_id")
+  subtotal       Decimal   @default(0) @db.Decimal(14, 2)
+  taxTotal       Decimal   @default(0) @map("tax_total") @db.Decimal(14, 2)
+  discount       Decimal   @default(0) @db.Decimal(14, 2)
+  extraCharges   Decimal   @default(0) @map("extra_charges") @db.Decimal(14, 2)
+  total          Decimal   @default(0) @db.Decimal(14, 2)
+  paidAmount     Decimal   @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  returnedAmount Decimal   @default(0) @map("returned_amount") @db.Decimal(14, 2)
+  status         String    @default("POSTED")
+  notes          String?
+  voidReason     String?   @map("void_reason")
+  voidedAt       DateTime? @map("voided_at")
+  voidedById     Int?      @map("voided_by_id")
+  createdById    Int       @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization    Organization     @relation(fields: [organizationId], references: [id])
+  supplier        Supplier         @relation(fields: [supplierId], references: [id])
+  items           PurchaseItem[]
+  purchaseReturns PurchaseReturn[]
+
+  @@unique([organizationId, invoiceNo])
+  @@index([organizationId, invoiceDate])
+  @@index([organizationId, supplierId])
+  @@index([organizationId, status])
+  @@map("purchase_invoices")
+}
+
+model PurchaseItem {
+  id                  Int     @id
+  purchaseId          Int     @map("purchase_id")
+  itemId              Int     @map("item_id")
+  enteredQty          Decimal @map("entered_qty") @db.Decimal(12, 3)
+  enteredUnit         String  @map("entered_unit")
+  conversionFactor    Decimal @default(1) @map("conversion_factor") @db.Decimal(12, 3)
+  bagCount            Int?    @map("bag_count")
+  qtyBase             Decimal @map("qty_base") @db.Decimal(12, 3)
+  ratePerEnteredUnit  Decimal @map("rate_per_entered_unit") @db.Decimal(14, 4)
+  ratePerBase         Decimal @map("rate_per_base") @db.Decimal(14, 4)
+  taxRate             Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount           Decimal @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  lineSubtotal        Decimal @map("line_subtotal") @db.Decimal(14, 2)
+  lineTotal           Decimal @map("line_total") @db.Decimal(14, 2)
+  allocatedQtyBase    Decimal @default(0) @map("allocated_qty_base") @db.Decimal(12, 3)
+  returnedQtyBase     Decimal @default(0) @map("returned_qty_base") @db.Decimal(12, 3)
+  notes               String?
+
+  purchase     PurchaseInvoice      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  item         Item                 @relation(fields: [itemId], references: [id])
+  returnItems  PurchaseReturnItem[]
+  batchSources BatchSource[]
+  movements    StockMovement[]
+
+  @@index([purchaseId])
+  @@index([itemId])
+  @@map("purchase_items")
+}
+
+model PurchaseReturn {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  returnNo       String    @map("return_no")
+  returnDate     DateTime  @map("return_date")
+  purchaseId     Int       @map("purchase_id")
+  supplierId     Int       @map("supplier_id")
+  reasonCode     String    @map("reason_code")
+  notes          String?
+  subtotal       Decimal   @default(0) @db.Decimal(14, 2)
+  taxTotal       Decimal   @default(0) @map("tax_total") @db.Decimal(14, 2)
+  total          Decimal   @default(0) @db.Decimal(14, 2)
+  settlementType String    @default("ADJUST_PAYABLE") @map("settlement_type")
+  status         String    @default("POSTED")
+  voidReason     String?   @map("void_reason")
+  voidedAt       DateTime? @map("voided_at")
+  voidedById     Int?      @map("voided_by_id")
+  createdById    Int       @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization         @relation(fields: [organizationId], references: [id])
+  purchase     PurchaseInvoice      @relation(fields: [purchaseId], references: [id])
+  supplier     Supplier             @relation(fields: [supplierId], references: [id])
+  items        PurchaseReturnItem[]
+
+  @@unique([organizationId, returnNo])
+  @@index([organizationId, returnDate])
+  @@index([organizationId, supplierId])
+  @@index([purchaseId])
+  @@map("purchase_returns")
+}
+
+model PurchaseReturnItem {
+  id                 Int     @id
+  purchaseReturnId   Int     @map("purchase_return_id")
+  purchaseItemId     Int     @map("purchase_item_id")
+  itemId             Int     @map("item_id")
+  enteredQty         Decimal @map("entered_qty") @db.Decimal(12, 3)
+  enteredUnit        String  @map("entered_unit")
+  qtyBase            Decimal @map("qty_base") @db.Decimal(12, 3)
+  ratePerBase        Decimal @map("rate_per_base") @db.Decimal(14, 4)
+  taxRate            Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount          Decimal @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  lineSubtotal       Decimal @map("line_subtotal") @db.Decimal(14, 2)
+  lineTotal          Decimal @map("line_total") @db.Decimal(14, 2)
+
+  purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  purchaseItem   PurchaseItem   @relation(fields: [purchaseItemId], references: [id])
+
+  @@index([purchaseReturnId])
+  @@index([purchaseItemId])
+  @@map("purchase_return_items")
+}
+
+model StockMovement {
+  id             Int      @id
+  organizationId Int      @map("organization_id")
+  itemId         Int      @map("item_id")
+  batchId        Int?     @map("batch_id")
+  purchaseItemId Int?     @map("purchase_item_id")
+  type           String
+  qtyBase        Decimal  @map("qty_base") @db.Decimal(12, 3)
+  refType        String   @map("ref_type")
+  refId          Int      @map("ref_id")
+  refNo          String?  @map("ref_no")
+  note           String?
+  userId         Int      @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  item         Item          @relation(fields: [itemId], references: [id])
+  batch        Batch?        @relation(fields: [batchId], references: [id])
+  purchaseItem PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
+
+  @@index([organizationId, itemId])
+  @@index([organizationId, batchId])
+  @@index([refType, refId])
+  @@map("stock_movements")
+}
+
+model Batch {
+  id                    Int       @id
+  organizationId        Int       @map("organization_id")
+  batchNo               String    @map("batch_no")
+  name                  String
+  nameUr                String?   @map("name_ur")
+  itemId                Int?      @map("item_id")
+  batchDate             DateTime  @map("batch_date")
+  status                String    @default("OPEN")
+  rawKg                 Decimal   @default(0) @map("raw_kg") @db.Decimal(12, 3)
+  plannedWastagePercent Decimal   @default(0) @map("planned_wastage_percent") @db.Decimal(6, 3)
+  plannedWastageKg      Decimal   @default(0) @map("planned_wastage_kg") @db.Decimal(12, 3)
+  wastagePercent        Decimal   @default(0) @map("wastage_percent") @db.Decimal(6, 3)
+  wastageKg             Decimal   @default(0) @map("wastage_kg") @db.Decimal(12, 3)
+  outputKg              Decimal   @default(0) @map("output_kg") @db.Decimal(12, 3)
+  rawCost               Decimal   @default(0) @map("raw_cost") @db.Decimal(14, 2)
+  extraCost             Decimal   @default(0) @map("extra_cost") @db.Decimal(14, 2)
+  totalCost             Decimal   @default(0) @map("total_cost") @db.Decimal(14, 2)
+  costPerKg             Decimal   @default(0) @map("cost_per_kg") @db.Decimal(14, 2)
+  notes                 String?
+  closedAt              DateTime? @map("closed_at")
+  closedById            Int?      @map("closed_by_id")
+  createdById           Int       @map("created_by_id")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  item         Item?           @relation(fields: [itemId], references: [id])
+  sources      BatchSource[]
+  costs        BatchCost[]
+  movements    StockMovement[]
+  saleItems    SaleItem[]
+  saleReturnItems SaleReturnItem[]
+
+  @@unique([organizationId, batchNo])
+  @@index([organizationId, status])
+  @@index([organizationId, itemId])
+  @@index([organizationId, batchDate])
+  @@map("batches")
+}
+
+model BatchSource {
+  id             Int      @id
+  batchId        Int      @map("batch_id")
+  purchaseItemId Int      @map("purchase_item_id")
+  itemId         Int      @map("item_id")
+  kgUsed         Decimal  @map("kg_used") @db.Decimal(12, 3)
+  ratePerBase    Decimal  @map("rate_per_base") @db.Decimal(14, 4)
+  amount         Decimal  @db.Decimal(14, 2)
+  notes          String?
+  createdById    Int      @map("created_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  batch        Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  purchaseItem PurchaseItem @relation(fields: [purchaseItemId], references: [id])
+  item         Item         @relation(fields: [itemId], references: [id])
+
+  @@index([batchId])
+  @@index([purchaseItemId])
+  @@index([itemId])
+  @@map("batch_sources")
+}
+
+model BatchCost {
+  id          Int       @id
+  batchId     Int       @map("batch_id")
+  costType    String    @map("cost_type")
+  costDate    DateTime  @map("cost_date")
+  description String
+  amount      Decimal   @db.Decimal(14, 2)
+  isVoided    Boolean   @default(false) @map("is_voided")
+  voidReason  String?   @map("void_reason")
+  voidedAt    DateTime? @map("voided_at")
+  voidedById  Int?      @map("voided_by_id")
+  createdById Int       @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId, isVoided])
+  @@map("batch_costs")
+}
+
+model LedgerEntry {
+  id             Int      @id
+  organizationId Int      @map("organization_id")
+  partyType      String   @map("party_type")
+  partyId        Int      @map("party_id")
+  entryDate      DateTime @map("entry_date")
+  refType        String   @map("ref_type")
+  refId          Int      @map("ref_id")
+  refNo          String?  @map("ref_no")
+  debit          Decimal  @default(0) @db.Decimal(14, 2)
+  credit         Decimal  @default(0) @db.Decimal(14, 2)
+  balance        Decimal  @default(0) @db.Decimal(14, 2)
+  narration      String
+  createdById    Int      @map("created_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, partyType, partyId, id])
+  @@index([organizationId, entryDate])
+  @@index([refType, refId])
+  @@map("ledger_entries")
+}
+
+model Payment {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  paymentNo      String    @map("payment_no")
+  direction      String
+  partyType      String    @map("party_type")
+  partyId        Int       @map("party_id")
+  paymentDate    DateTime  @map("payment_date")
+  method         String
+  amount         Decimal   @db.Decimal(14, 2)
+  referenceNo    String?   @map("reference_no")
+  bankName       String?   @map("bank_name")
+  chequeDate     DateTime? @map("cheque_date")
+  status         String    @default("POSTED")
+  notes          String?
+  voidReason     String?   @map("void_reason")
+  voidedAt       DateTime? @map("voided_at")
+  voidedById     Int?      @map("voided_by_id")
+  createdById    Int       @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  allocations  PaymentAllocation[]
+
+  @@unique([organizationId, paymentNo])
+  @@index([organizationId, partyType, partyId])
+  @@index([organizationId, paymentDate])
+  @@map("payments")
+}
+
+model PaymentAllocation {
+  id          Int     @id
+  paymentId   Int     @map("payment_id")
+  invoiceType String  @map("invoice_type")
+  invoiceId   Int     @map("invoice_id")
+  amount      Decimal @db.Decimal(14, 2)
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([invoiceType, invoiceId])
+  @@map("payment_allocations")
+}
+
+model Attachment {
+  id             Int      @id
+  organizationId Int      @map("organization_id")
+  ownerType      String   @map("owner_type")
+  ownerId        Int      @map("owner_id")
+  fileName       String   @map("file_name")
+  filePath       String   @map("file_path")
+  mimeType       String   @map("mime_type")
+  uploadedById   Int      @map("uploaded_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, ownerType, ownerId])
+  @@map("attachments")
+}
+
+model Route {
+  id                 Int      @id
+  organizationId     Int      @map("organization_id")
+  code               String?
+  name               String
+  nameUr             String?  @map("name_ur")
+  description        String?
+  assignedOfficerId  Int?     @map("assigned_officer_id")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  assignedOfficer User?         @relation("OfficerRoutes", fields: [assignedOfficerId], references: [id])
+  clients         Client[]
+  salesInvoices   SaleInvoice[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("routes")
+}
+
+model Client {
+  id             Int      @id
+  organizationId Int      @map("organization_id")
+  routeId        Int?     @map("route_id")
+  code           String?
+  name           String
+  nameUr         String?  @map("name_ur")
+  contactPerson  String?  @map("contact_person")
+  phone          String?
+  address        String?
+  taxNo          String?  @map("tax_no")
+  creditLimit    Decimal  @default(0) @map("credit_limit") @db.Decimal(14, 2)
+  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  recoveryDay    String?  @map("recovery_day")
+  notes          String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+  route         Route?        @relation(fields: [routeId], references: [id])
+  salesInvoices SaleInvoice[]
+  saleReturns   SaleReturn[]
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, name])
+  @@index([organizationId, routeId])
+  @@map("clients")
+}
+
+model SaleInvoice {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  invoiceNo      String    @map("invoice_no")
+  saleDate       DateTime  @map("sale_date")
+  clientId       Int       @map("client_id")
+  routeId        Int?      @map("route_id")
+  subtotal       Decimal   @default(0) @db.Decimal(14, 2)
+  taxTotal       Decimal   @default(0) @map("tax_total") @db.Decimal(14, 2)
+  discount       Decimal   @default(0) @db.Decimal(14, 2)
+  extraCharges   Decimal   @default(0) @map("extra_charges") @db.Decimal(14, 2)
+  total          Decimal   @default(0) @db.Decimal(14, 2)
+  totalCogs      Decimal   @default(0) @map("total_cogs") @db.Decimal(14, 2)
+  totalProfit    Decimal   @default(0) @map("total_profit") @db.Decimal(14, 2)
+  paidAmount     Decimal   @default(0) @map("paid_amount") @db.Decimal(14, 2)
+  returnedAmount Decimal   @default(0) @map("returned_amount") @db.Decimal(14, 2)
+  status         String    @default("POSTED")
+  notes          String?
+  voidReason     String?   @map("void_reason")
+  voidedAt       DateTime? @map("voided_at")
+  voidedById     Int?      @map("voided_by_id")
+  createdById    Int       @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  client       Client        @relation(fields: [clientId], references: [id])
+  route        Route?        @relation(fields: [routeId], references: [id])
+  items        SaleItem[]
+  returns      SaleReturn[]
+
+  @@unique([organizationId, invoiceNo])
+  @@index([organizationId, saleDate])
+  @@index([organizationId, clientId])
+  @@index([organizationId, routeId])
+  @@index([organizationId, status])
+  @@map("sales_invoices")
+}
+
+model SaleItem {
+  id                     Int     @id
+  saleId                 Int     @map("sale_id")
+  batchId                Int     @map("batch_id")
+  itemId                 Int     @map("item_id")
+  enteredQty             Decimal @map("entered_qty") @db.Decimal(12, 3)
+  enteredUnit            String  @map("entered_unit")
+  conversionFactor       Decimal @default(1) @map("conversion_factor") @db.Decimal(12, 3)
+  bagCount               Int?    @map("bag_count")
+  qtyBase                Decimal @map("qty_base") @db.Decimal(12, 3)
+  ratePerEnteredUnit     Decimal @map("rate_per_entered_unit") @db.Decimal(14, 4)
+  ratePerBase            Decimal @map("rate_per_base") @db.Decimal(14, 4)
+  taxRate                Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount              Decimal @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  lineSubtotal           Decimal @map("line_subtotal") @db.Decimal(14, 2)
+  lineTotal              Decimal @map("line_total") @db.Decimal(14, 2)
+  batchCostRateSnapshot  Decimal @map("batch_cost_rate_snapshot") @db.Decimal(14, 4)
+  lineCogs               Decimal @map("line_cogs") @db.Decimal(14, 2)
+  lineProfit             Decimal @map("line_profit") @db.Decimal(14, 2)
+  returnedQtyBase        Decimal @default(0) @map("returned_qty_base") @db.Decimal(12, 3)
+  notes                  String?
+
+  sale        SaleInvoice      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  batch       Batch            @relation(fields: [batchId], references: [id])
+  item        Item             @relation(fields: [itemId], references: [id])
+  returnItems SaleReturnItem[]
+
+  @@index([saleId])
+  @@index([batchId])
+  @@index([itemId])
+  @@map("sale_items")
+}
+
+model SaleReturn {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  returnNo       String    @map("return_no")
+  returnDate     DateTime  @map("return_date")
+  saleId         Int       @map("sale_id")
+  clientId       Int       @map("client_id")
+  reasonCode     String    @map("reason_code")
+  notes          String?
+  subtotal       Decimal   @default(0) @db.Decimal(14, 2)
+  taxTotal       Decimal   @default(0) @map("tax_total") @db.Decimal(14, 2)
+  deduction      Decimal   @default(0) @db.Decimal(14, 2)
+  total          Decimal   @default(0) @db.Decimal(14, 2)
+  settlementType String    @default("ADJUST_BALANCE") @map("settlement_type")
+  status         String    @default("POSTED")
+  voidReason     String?   @map("void_reason")
+  voidedAt       DateTime? @map("voided_at")
+  voidedById     Int?      @map("voided_by_id")
+  createdById    Int       @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  sale         SaleInvoice      @relation(fields: [saleId], references: [id])
+  client       Client           @relation(fields: [clientId], references: [id])
+  items        SaleReturnItem[]
+
+  @@unique([organizationId, returnNo])
+  @@index([organizationId, returnDate])
+  @@index([organizationId, clientId])
+  @@index([saleId])
+  @@map("sale_returns")
+}
+
+model SaleReturnItem {
+  id                    Int     @id
+  saleReturnId          Int     @map("sale_return_id")
+  saleItemId            Int     @map("sale_item_id")
+  batchId               Int     @map("batch_id")
+  itemId                Int     @map("item_id")
+  enteredQty            Decimal @map("entered_qty") @db.Decimal(12, 3)
+  enteredUnit           String  @map("entered_unit")
+  qtyBase               Decimal @map("qty_base") @db.Decimal(12, 3)
+  ratePerBase           Decimal @map("rate_per_base") @db.Decimal(14, 4)
+  taxRate               Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount             Decimal @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  lineSubtotal          Decimal @map("line_subtotal") @db.Decimal(14, 2)
+  lineTotal             Decimal @map("line_total") @db.Decimal(14, 2)
+  condition             String  @default("RESALEABLE")
+  batchCostRateSnapshot Decimal @map("batch_cost_rate_snapshot") @db.Decimal(14, 4)
+  cogsReversed          Decimal @default(0) @map("cogs_reversed") @db.Decimal(14, 2)
+  lossAmount            Decimal @default(0) @map("loss_amount") @db.Decimal(14, 2)
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItem   SaleItem   @relation(fields: [saleItemId], references: [id])
+  batch      Batch      @relation(fields: [batchId], references: [id])
+  item       Item       @relation(fields: [itemId], references: [id])
+
+  @@index([saleReturnId])
+  @@index([saleItemId])
+  @@index([batchId])
+  @@index([itemId])
+  @@map("sale_return_items")
 }

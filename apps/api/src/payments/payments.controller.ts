@@ -1,0 +1,64 @@
+import {
+  createSupplierPaymentSchema,
+  listPaymentsQuerySchema,
+  voidDocumentSchema,
+  type PaginatedResponse,
+  type PaymentDto,
+} from '@mini-erp/shared';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import {
+  CurrentUser,
+  RequirePermission,
+  type RequestUserContext,
+} from '../common/auth.decorators.js';
+import { parseWithZod } from '../common/zod-pipe.js';
+import { PaymentsService } from './payments.service.js';
+
+@Controller('payments')
+export class PaymentsController {
+  constructor(private readonly paymentsService: PaymentsService) {}
+
+  @RequirePermission('payments', 'view')
+  @Get()
+  listPayments(
+    @CurrentUser() auth: RequestUserContext,
+    @Query() rawQuery: unknown,
+  ): Promise<PaginatedResponse<PaymentDto>> {
+    const query = parseWithZod(listPaymentsQuerySchema, rawQuery);
+    return this.paymentsService.listPayments(auth.user.organizationId, query);
+  }
+
+  @RequirePermission('payments', 'view')
+  @Get(':id')
+  getPayment(
+    @CurrentUser() auth: RequestUserContext,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<PaymentDto> {
+    return this.paymentsService.getPaymentById(auth.user.organizationId, id);
+  }
+
+  @RequirePermission('payments', 'create')
+  @Post('supplier')
+  createSupplierPayment(
+    @CurrentUser() auth: RequestUserContext,
+    @Body() body: unknown,
+  ): Promise<PaymentDto> {
+    const input = parseWithZod(createSupplierPaymentSchema, body);
+    return this.paymentsService.createSupplierPayment(
+      auth.user.organizationId,
+      auth.user.id,
+      input,
+    );
+  }
+
+  @RequirePermission('payments', 'delete')
+  @Post(':id/void')
+  voidPayment(
+    @CurrentUser() auth: RequestUserContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+  ): Promise<PaymentDto> {
+    const input = parseWithZod(voidDocumentSchema, body);
+    return this.paymentsService.voidPayment(auth.user.organizationId, auth.user.id, id, input);
+  }
+}

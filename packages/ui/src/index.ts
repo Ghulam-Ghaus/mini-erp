@@ -15,6 +15,7 @@ export * from './components/money-text.js';
 export * from './components/number-input.js';
 export * from './components/page-header.js';
 export * from './components/pagination.js';
+export * from './components/row-actions.js';
 export * from './components/select.js';
 export * from './components/status-badge.js';
 export * from './components/text-input.js';

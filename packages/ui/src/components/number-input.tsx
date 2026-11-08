@@ -58,7 +58,10 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(functi
     if (trimmed !== '' && trimmed !== '-') {
       try {
         const d = new Decimal(trimmed).toDecimalPlaces(maxDecimals, Decimal.ROUND_HALF_UP);
-        onChange(d.toFixed(maxDecimals));
+        const formatted = d.toFixed(maxDecimals);
+        if (formatted !== value) {
+          onChange(formatted);
+        }
       } catch {
         // leave value untouched so Zod reports validation error
       }

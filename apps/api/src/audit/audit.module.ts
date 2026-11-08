@@ -5,7 +5,20 @@ import type { Prisma } from '../generated/prisma/client.js';
 export interface AuditLogInput {
   readonly organizationId: number;
   readonly userId?: number | null;
-  readonly action: 'CREATE' | 'UPDATE' | 'CANCEL' | 'LOGIN' | 'PIN_CHANGE' | 'SETUP';
+  readonly action:
+    | 'CREATE'
+    | 'UPDATE'
+    | 'CANCEL'
+    | 'VOID'
+    | 'LOGIN'
+    | 'PIN_CHANGE'
+    | 'SETUP'
+    | 'ALLOCATE_PURCHASE'
+    | 'ADD_COST'
+    | 'VOID_COST'
+    | 'UPDATE_WASTAGE'
+    | 'CLOSE'
+    | 'ADJUST_STOCK';
   readonly entity: string;
   readonly entityId?: number | null;
   readonly beforeJson?: Prisma.InputJsonValue;

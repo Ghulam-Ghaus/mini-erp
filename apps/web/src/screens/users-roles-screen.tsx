@@ -32,7 +32,7 @@ import {
 } from '@mini-erp/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Resolver } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import {
@@ -104,7 +104,7 @@ export function UsersRolesScreen({ canCreate, canEdit }: UsersRolesScreenProps) 
   const defaultRoleId = roles.find((r) => r.code === 'SALES')?.id ?? roles[0]?.id ?? 1;
 
   const createForm = useForm<CreateUserInput>({
-    resolver: zodResolver(createUserSchema),
+    resolver: zodResolver(createUserSchema) as Resolver<CreateUserInput>,
     defaultValues: {
       firstName: '',
       lastName: '',
@@ -116,7 +116,7 @@ export function UsersRolesScreen({ canCreate, canEdit }: UsersRolesScreenProps) 
   });
 
   const editForm = useForm<EditUserFormValues>({
-    resolver: zodResolver(editUserFormSchema),
+    resolver: zodResolver(editUserFormSchema) as Resolver<EditUserFormValues>,
     defaultValues: {
       firstName: '',
       lastName: '',
