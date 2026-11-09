@@ -5,7 +5,7 @@ import {
   type DesktopBridge,
   type DesktopNotificationPayload,
 } from '@mini-erp/shared';
-import { app, BrowserWindow, dialog, ipcMain, Notification } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, session } from 'electron';
 import { watch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import { ApiProcess } from './api-process.js';
@@ -49,6 +49,10 @@ ipcMain.on(DESKTOP_NOTIFY_CHANNEL, (_event, payload: DesktopNotificationPayload)
       body: payload.body,
     }).show();
   }
+});
+
+ipcMain.handle('app:check-for-updates', () => {
+  return { status: 'up-to-date', version: app.getVersion() };
 });
 
 async function startApi(): Promise<void> {
@@ -169,6 +173,18 @@ async function bootstrap(): Promise<void> {
     app.quit();
     return;
   }
+
+  // Security hardening: enforce Content Security Policy
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self' 'unsafe-inline' data: blob:; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*;",
+        ],
+      },
+    });
+  });
 
   mainWindow = createWindow();
   if (isDev) watchApiInDev();

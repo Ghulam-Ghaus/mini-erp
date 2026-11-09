@@ -35,6 +35,8 @@ import {
   setStoredToken,
 } from './lib/api.js';
 import { DashboardScreen } from './screens/dashboard-screen.js';
+import { AuditScreen } from './screens/audit-screen.js';
+import { BackupScreen } from './screens/backup-screen.js';
 import { BatchesScreen } from './screens/batches-screen.js';
 import { ChallansScreen } from './screens/challans-screen.js';
 import { Client360Screen } from './screens/client-360-screen.js';
@@ -327,6 +329,12 @@ function RootApplication() {
     }
     if (can('users', 'view')) {
       items.push({ id: 'users-roles', label: t('nav.usersRoles'), icon: <DotIcon /> });
+    }
+    if (can('audit', 'view')) {
+      items.push({ id: 'audit-logs', label: t('nav.auditLogs'), icon: <DotIcon /> });
+    }
+    if (can('backup', 'view')) {
+      items.push({ id: 'backup', label: t('nav.backup'), icon: <DotIcon /> });
     }
     if (can('settings', 'view')) {
       items.push({ id: 'settings', label: t('nav.settings'), icon: <DotIcon /> });
@@ -688,6 +696,10 @@ function RootApplication() {
         <ReportsScreen />
       ) : activeNavId === 'notifications' && can('notifications', 'view') ? (
         <NotificationsScreen onNavigate={setActiveNavId} />
+      ) : activeNavId === 'audit-logs' && can('audit', 'view') ? (
+        <AuditScreen />
+      ) : activeNavId === 'backup' && can('backup', 'view') ? (
+        <BackupScreen />
       ) : (activeNavId === 'recovery' ||
           activeNavId === 'todays-recovery' ||
           activeNavId === 'recovery-entries' ||

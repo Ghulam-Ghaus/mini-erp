@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.minierp.desktop",
+  "productName": "Mini ERP",
+  "directories": {
+    "output": "release"
+  },
+  "files": ["dist/**/*"],
+  "extraResources": [
+    {
+      "from": "../web/dist",
+      "to": "web"
+    },
+    {
+      "from": "../api/dist",
+      "to": "api/dist"
+    },
+    {
+      "from": "../../prisma",
+      "to": "prisma"
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Mini ERP"
+  }
+}

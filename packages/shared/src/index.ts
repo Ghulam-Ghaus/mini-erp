@@ -20,5 +20,7 @@ export * from './expenses.js';
 export * from './payroll.js';
 export * from './reports.js';
 export * from './notifications.js';
+export * from './audit.js';
+export * from './backup.js';
 export * from './suppliers.js';
 export * from './users.js';

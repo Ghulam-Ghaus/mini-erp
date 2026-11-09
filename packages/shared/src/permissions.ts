@@ -28,6 +28,7 @@ export const PERMISSION_MODULES = [
   'users',
   'settings',
   'backup',
+  'audit',
 ] as const;
 
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];

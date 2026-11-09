@@ -4,8 +4,14 @@ import {
   type AddBatchAllocationInput,
   type AddBatchCostInput,
   type AdjustBatchStockInput,
+  type AuditLogDto,
+  type AuditLogQueryDto,
   type AuthSessionResponse,
   type AvailablePurchaseItemDto,
+  type BackupLogDto,
+  type BackupQueryDto,
+  type BackupSummaryDto,
+  type BackupType,
   type BatchDetailDto,
   type BatchSummaryDto,
   type ChangePinInput,
@@ -1103,4 +1109,72 @@ export function markAllNotificationsRead(): Promise<{ count: number }> {
   return apiRequest<{ count: number }>('/notifications/read-all', {
     method: 'POST',
   });
+}
+
+// ---------------------------------------------------------------------------
+// Audit Logs (Phase 12)
+// ---------------------------------------------------------------------------
+
+export function fetchAuditLogs(query: AuditLogQueryDto): Promise<PaginatedResponse<AuditLogDto>> {
+  return apiRequest<PaginatedResponse<AuditLogDto>>(
+    `/audit-logs${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      search: query.search,
+      action: query.action,
+      entity: query.entity,
+      userId: query.userId,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Backups (Phase 12)
+// ---------------------------------------------------------------------------
+
+export function fetchBackupLogs(query: BackupQueryDto): Promise<PaginatedResponse<BackupLogDto>> {
+  return apiRequest<PaginatedResponse<BackupLogDto>>(
+    `/backups${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      type: query.type,
+      status: query.status,
+    })}`,
+  );
+}
+
+export function fetchBackupSummary(): Promise<BackupSummaryDto> {
+  return apiRequest<BackupSummaryDto>('/backups/summary');
+}
+
+export function createManualBackup(type: BackupType = 'MANUAL'): Promise<BackupLogDto> {
+  return apiRequest<BackupLogDto>('/backups/manual', {
+    method: 'POST',
+    body: JSON.stringify({ type }),
+  });
+}
+
+export function restoreBackup(
+  backupId: number,
+  confirmCode: 'RESTORE',
+): Promise<{
+  readonly success: boolean;
+  readonly restoredBackupId: number;
+  readonly preRestoreBackupId: number;
+}> {
+  return apiRequest<{
+    readonly success: boolean;
+    readonly restoredBackupId: number;
+    readonly preRestoreBackupId: number;
+  }>(`/backups/${backupId}/restore`, {
+    method: 'POST',
+    body: JSON.stringify({ confirmCode }),
+  });
+}
+
+export function getBackupDownloadUrl(backupId: number): string {
+  const base = getApiBaseUrl();
+  return `${base}/api/backups/${backupId}/download`;
 }

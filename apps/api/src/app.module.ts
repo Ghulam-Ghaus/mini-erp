@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BackupModule } from './backup/backup.module.js';
 import { BatchesModule } from './batches/batches.module.js';
 import { AppConfigModule } from './config/config.module.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -52,6 +53,7 @@ import { UsersModule } from './users/users.module.js';
     PayrollModule,
     ReportsModule,
     NotificationsModule,
+    BackupModule,
   ],
 })
 export class AppModule {}

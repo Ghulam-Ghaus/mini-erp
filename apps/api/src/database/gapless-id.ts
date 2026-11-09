@@ -54,6 +54,7 @@ export const GAPLESS_TABLES = [
   'salary_advances',
   'salary_records',
   'notifications',
+  'backup_logs',
 ] as const;
 
 export type GaplessTable = (typeof GAPLESS_TABLES)[number];

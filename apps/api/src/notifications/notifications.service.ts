@@ -332,22 +332,30 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       }
 
       // 4. No backup for 24 hours warning
-      const org = await tx.organization.findUnique({
-        where: { id: organizationId },
-        select: { settingsJson: true },
-      });
+      const [org, lastBackupLog] = await Promise.all([
+        tx.organization.findUnique({
+          where: { id: organizationId },
+          select: { settingsJson: true },
+        }),
+        tx.backupLog.findFirst({
+          where: { organizationId, status: 'SUCCESS' },
+          orderBy: { finishedAt: 'desc' },
+        }),
+      ]);
       const settings = (org?.settingsJson as Record<string, unknown> | null) ?? {};
-      const lastBackupStr = settings['lastBackupAt'] as string | undefined;
+      const lastBackupDate =
+        lastBackupLog?.finishedAt ??
+        (settings['lastBackupAt'] ? new Date(settings['lastBackupAt'] as string) : null);
       const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-      if (!lastBackupStr || new Date(lastBackupStr) < twentyFourHoursAgo) {
+      if (!lastBackupDate || lastBackupDate < twentyFourHoursAgo) {
         const dedupeKey = `BACKUP_WARNING_${todayStr}`;
         const created = await this.createNotificationIfAbsent(tx, organizationId, {
           type: 'BACKUP_WARNING',
           severity: 'CRITICAL',
           title: 'Database Backup Warning',
-          body: lastBackupStr
-            ? `No database backup has completed in the last 24 hours. Last backup: ${new Date(lastBackupStr).toLocaleString()}.`
+          body: lastBackupDate
+            ? `No database backup has completed in the last 24 hours. Last backup: ${lastBackupDate.toLocaleString()}.`
             : 'No database backup has been taken yet. Please run or configure a backup in Settings.',
           refType: 'BACKUP',
           dedupeKey,

@@ -17,7 +17,7 @@ import {
   type ColumnDef,
 } from '@mini-erp/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   fetchNotifications,
@@ -96,18 +96,21 @@ export function NotificationsScreen({ onNavigate }: NotificationsScreenProps) {
     },
   });
 
-  const handleNavigateRef = (row: NotificationDto) => {
-    if (!onNavigate) return;
-    if (row.refType === 'CHEQUE') {
-      onNavigate('payments-cheques');
-    } else if (row.refType === 'CLIENT') {
-      onNavigate('todays-recovery');
-    } else if (row.refType === 'BATCH') {
-      onNavigate('batches');
-    } else if (row.refType === 'BACKUP') {
-      onNavigate('settings');
-    }
-  };
+  const handleNavigateRef = useCallback(
+    (row: NotificationDto) => {
+      if (!onNavigate) return;
+      if (row.refType === 'CHEQUE') {
+        onNavigate('payments-cheques');
+      } else if (row.refType === 'CLIENT') {
+        onNavigate('todays-recovery');
+      } else if (row.refType === 'BATCH') {
+        onNavigate('batches');
+      } else if (row.refType === 'BACKUP') {
+        onNavigate('settings');
+      }
+    },
+    [onNavigate],
+  );
 
   const columns = useMemo<ColumnDef<NotificationDto, unknown>[]>(
     () => [
@@ -206,7 +209,7 @@ export function NotificationsScreen({ onNavigate }: NotificationsScreenProps) {
         ),
       },
     ],
-    [t, markReadMutation, onNavigate],
+    [t, markReadMutation, handleNavigateRef, onNavigate],
   );
 
   return (

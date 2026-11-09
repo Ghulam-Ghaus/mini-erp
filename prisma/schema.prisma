@@ -67,6 +67,7 @@ model Organization {
   salaryAdvances    SalaryAdvance[]
   salaryRecords     SalaryRecord[]
   notifications     Notification[]
+  backupLogs        BackupLog[]
 
   @@map("organizations")
 }
@@ -1015,4 +1016,23 @@ model Notification {
   @@index([organizationId, isRead, createdAt])
   @@index([organizationId, type])
   @@map("notifications")
+}
+
+model BackupLog {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  type           String
+  status         String    @default("RUNNING")
+  path           String?
+  sizeBytes      BigInt?   @map("size_bytes")
+  startedAt      DateTime  @default(now()) @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+  error          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+  @@map("backup_logs")
 }

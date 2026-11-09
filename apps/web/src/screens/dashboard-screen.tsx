@@ -130,7 +130,10 @@ export function DashboardScreen({ orgName, currency, onNavigate }: DashboardScre
     [t, currency],
   );
 
-  const dailySeries = data?.charts.dailySalesVsReceived ?? [];
+  const dailySeries = useMemo(
+    () => data?.charts.dailySalesVsReceived ?? [],
+    [data?.charts.dailySalesVsReceived],
+  );
   const maxDailyVal = useMemo(() => {
     let m = 1;
     for (const pt of dailySeries) {
@@ -142,7 +145,10 @@ export function DashboardScreen({ orgName, currency, onNavigate }: DashboardScre
     return m;
   }, [dailySeries]);
 
-  const batchProfitSeries = data?.charts.profitByBatch ?? [];
+  const batchProfitSeries = useMemo(
+    () => data?.charts.profitByBatch ?? [],
+    [data?.charts.profitByBatch],
+  );
   const maxBatchProfitVal = useMemo(() => {
     let m = 1;
     for (const pt of batchProfitSeries) {

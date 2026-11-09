@@ -164,7 +164,7 @@ export class ReportsService {
       this.prisma.saleInvoice.findMany({
         where: {
           organizationId,
-          status: 'POSTED',
+          status: { in: ['POSTED', 'PARTIAL', 'PAID'] },
           saleDate: { gte: startDate, lte: endDate },
         },
       }),
@@ -215,7 +215,7 @@ export class ReportsService {
         include: {
           item: true,
           saleItems: {
-            where: { sale: { status: 'POSTED' } },
+            where: { sale: { status: { in: ['POSTED', 'PARTIAL', 'PAID'] } } },
           },
           saleReturnItems: {
             where: { saleReturn: { status: 'POSTED' } },
@@ -234,7 +234,7 @@ export class ReportsService {
         include: {
           route: { include: { assignedOfficer: true } },
           salesInvoices: {
-            where: { status: 'POSTED' },
+            where: { status: { in: ['POSTED', 'PARTIAL', 'PAID'] } },
             select: { saleDate: true, total: true, returnedAmount: true, paidAmount: true },
           },
         },
@@ -533,7 +533,7 @@ export class ReportsService {
         ...(query.itemId ? { itemId: query.itemId } : {}),
         sale: {
           organizationId,
-          status: 'POSTED',
+          status: { in: ['POSTED', 'PARTIAL', 'PAID'] },
           ...(query.clientId ? { clientId: query.clientId } : {}),
           ...(query.routeId ? { routeId: query.routeId } : {}),
           ...(query.salespersonId ? { createdById: query.salespersonId } : {}),
@@ -755,7 +755,7 @@ export class ReportsService {
           include: {
             route: true,
             salesInvoices: {
-              where: { status: 'POSTED' },
+              where: { status: { in: ['POSTED', 'PARTIAL', 'PAID'] } },
               orderBy: { saleDate: 'desc' },
             },
           },
