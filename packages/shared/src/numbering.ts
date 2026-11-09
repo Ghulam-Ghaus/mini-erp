@@ -9,6 +9,9 @@ export const DOCUMENT_TYPES = [
   'SALE_RETURN',
   'CHALLAN',
   'PAYMENT_IN',
+  'EXPENSE',
+  'SALARY_ADVANCE',
+  'SALARY_SLIP',
 ] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
@@ -22,6 +25,9 @@ export const DEFAULT_DOCUMENT_PREFIXES: Record<DocumentType, string> = {
   SALE_RETURN: 'CRN',
   CHALLAN: 'CH',
   PAYMENT_IN: 'RCP',
+  EXPENSE: 'EXP',
+  SALARY_ADVANCE: 'ADV',
+  SALARY_SLIP: 'SAL',
 };
 
 export const numberSequenceDtoSchema = z.object({

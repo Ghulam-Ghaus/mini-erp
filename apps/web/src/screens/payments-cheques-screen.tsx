@@ -41,6 +41,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Decimal } from 'decimal.js';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PrintDocumentDialog, type PrintableDocument } from '../components/print-document-dialog';
 import {
   createClientPayment,
   fetchCheques,
@@ -135,6 +136,7 @@ export function PaymentsChequesScreen({
 
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentDto | null>(null);
   const [voidReason, setVoidReason] = useState('');
+  const [printDoc, setPrintDoc] = useState<PrintableDocument | null>(null);
 
   // --- Tab 2: Cheques Register state ---
   const [chequeSearch, setChequeSearch] = useState('');
@@ -554,6 +556,12 @@ export function PaymentsChequesScreen({
         cell: ({ row }) => (
           <RowActions
             actions={[
+              {
+                id: 'print',
+                label: 'Print',
+                inline: true,
+                onClick: () => setPrintDoc({ type: 'PAYMENT_IN', data: row.original }),
+              },
               {
                 id: 'view',
                 label: t('common.view'),
@@ -1371,6 +1379,12 @@ export function PaymentsChequesScreen({
           </div>
         )}
       </Dialog>
+
+      <PrintDocumentDialog
+        open={Boolean(printDoc)}
+        document={printDoc}
+        onClose={() => setPrintDoc(null)}
+      />
     </div>
   );
 }

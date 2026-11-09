@@ -9,45 +9,81 @@ import {
   type BatchDetailDto,
   type BatchSummaryDto,
   type ChangePinInput,
+  type ChallanDto,
   type ChequeDto,
   type ClientDto,
   type ClientLedgerQuery,
   type ClientLedgerResponse,
   type CloseBatchInput,
   type CreateBatchInput,
+  type CreateChallanInput,
   type CreateClientInput,
   type CreateClientPaymentInput,
+  type CreateEmployeeInput,
+  type CreateExpenseCategoryInput,
+  type CreateExpenseInput,
   type CreateItemInput,
   type CreatePurchaseInvoiceInput,
   type CreatePurchaseReturnInput,
+  type CreateRecoveryEntryInput,
   type CreateRouteInput,
+  type CreateSalaryAdvanceInput,
+  type CreateSalaryRecordInput,
   type CreateSaleInvoiceInput,
   type CreateSaleReturnInput,
   type CreateSupplierInput,
   type CreateSupplierPaymentInput,
   type CreateUserInput,
+  type DashboardQueryInput,
+  type DashboardResponseDto,
+  type DetailedSalesReportQueryInput,
+  type DetailedSalesReportResponseDto,
+  type EmployeeDto,
+  type ExpenseCategoryDto,
+  type ExpenseDto,
+  type ExpensesSummaryDto,
   type HealthResponse,
   type ItemDto,
   type ListBatchesQuery,
+  type ListChallansQuery,
   type ListChequesQuery,
   type ListClientsQuery,
+  type ListEmployeesQuery,
+  type ListExpensesQuery,
   type ListItemsQuery,
+  type ListNotificationsQuery,
   type ListPaymentsQuery,
   type ListPurchaseReturnsQuery,
   type ListPurchasesQuery,
+  type ListRecoveryEntriesQuery,
   type ListRoutesQuery,
+  type ListSalaryAdvancesQuery,
+  type ListSalaryRecordsQuery,
   type ListSaleReturnsQuery,
   type ListSalesQuery,
   type ListStockMovementsQuery,
   type ListSuppliersQuery,
   type LoginInput,
+  type NetProfitQuery,
+  type NetProfitSummaryDto,
+  type NotificationDto,
+  type NotificationsListResponseDto,
   type OrganizationDto,
+  type OtherReportsQueryInput,
+  type OtherReportsResponseDto,
   type PaginatedResponse,
   type PaymentDto,
+  type PrintTrackResultDto,
   type PurchaseInvoiceDto,
   type PurchaseReturnDto,
+  type RecoveryAgingQuery,
+  type RecoveryAgingSummaryDto,
+  type RecoveryEntryDto,
   type RoleWithPermissionsDto,
   type RouteDto,
+  type RunNotificationScanResultDto,
+  type SalaryAdvanceDto,
+  type SalaryRecordDto,
   type SaleInvoiceDto,
   type SaleReturnDto,
   type SetupInitializeInput,
@@ -56,9 +92,14 @@ import {
   type SupplierDto,
   type SupplierLedgerQuery,
   type SupplierLedgerResponse,
+  type TodaysRecoveryQuery,
+  type TodaysRecoveryResponse,
+  type TrackPrintInput,
   type UpdateBatchWastageInput,
+  type UpdateChallanStatusInput,
   type UpdateChequeStatusInput,
   type UpdateClientInput,
+  type UpdateEmployeeInput,
   type UpdateItemInput,
   type UpdateOrganizationInput,
   type UpdateRolePermissionsInput,
@@ -729,5 +770,337 @@ export function voidSaleReturn(id: number, reason: string): Promise<SaleReturnDt
   return apiRequest<SaleReturnDto>(`/sale-returns/${id}/void`, {
     method: 'POST',
     body: JSON.stringify({ reason }),
+  });
+}
+
+// --- Recovery API ---
+export function fetchTodaysRecovery(
+  query: Partial<TodaysRecoveryQuery> = {},
+): Promise<TodaysRecoveryResponse> {
+  return apiRequest<TodaysRecoveryResponse>(
+    `/recovery/today${buildQueryString({
+      targetDate: query.targetDate,
+      routeId: query.routeId,
+      officerId: query.officerId,
+      recoveryDay: query.recoveryDay,
+      search: query.search,
+    })}`,
+  );
+}
+
+export function fetchRecoveryEntries(
+  query: Partial<ListRecoveryEntriesQuery> = {},
+): Promise<PaginatedResponse<RecoveryEntryDto>> {
+  return apiRequest<PaginatedResponse<RecoveryEntryDto>>(
+    `/recovery/entries${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+      search: query.search,
+      clientId: query.clientId,
+      routeId: query.routeId,
+      officerId: query.officerId,
+      outcome: query.outcome,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+export function createRecoveryEntry(input: CreateRecoveryEntryInput): Promise<RecoveryEntryDto> {
+  return apiRequest<RecoveryEntryDto>('/recovery/entries', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchRecoveryAging(
+  query: Partial<RecoveryAgingQuery> = {},
+): Promise<RecoveryAgingSummaryDto> {
+  return apiRequest<RecoveryAgingSummaryDto>(
+    `/recovery/aging${buildQueryString({
+      asOfDate: query.asOfDate,
+      routeId: query.routeId,
+      search: query.search,
+    })}`,
+  );
+}
+
+// --- Challans & Print Tracking API ---
+export function fetchChallans(
+  query: Partial<ListChallansQuery> = {},
+): Promise<PaginatedResponse<ChallanDto>> {
+  return apiRequest<PaginatedResponse<ChallanDto>>(
+    `/challans${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+      search: query.search,
+      status: query.status,
+      saleId: query.saleId,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+export function fetchChallan(id: number): Promise<ChallanDto> {
+  return apiRequest<ChallanDto>(`/challans/${id}`);
+}
+
+export function createChallan(input: CreateChallanInput): Promise<ChallanDto> {
+  return apiRequest<ChallanDto>('/challans', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateChallanStatus(
+  id: number,
+  input: UpdateChallanStatusInput,
+): Promise<ChallanDto> {
+  return apiRequest<ChallanDto>(`/challans/${id}/status`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function trackPrint(input: TrackPrintInput): Promise<PrintTrackResultDto> {
+  return apiRequest<PrintTrackResultDto>('/challans/print-track', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+// --- Expenses API ---
+export function fetchExpenseCategories(): Promise<ExpenseCategoryDto[]> {
+  return apiRequest<ExpenseCategoryDto[]>('/expenses/categories');
+}
+
+export function createExpenseCategory(
+  input: CreateExpenseCategoryInput,
+): Promise<ExpenseCategoryDto> {
+  return apiRequest<ExpenseCategoryDto>('/expenses/categories', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchExpenses(
+  query: Partial<ListExpensesQuery> = {},
+): Promise<PaginatedResponse<ExpenseDto> & { summary: ExpensesSummaryDto }> {
+  return apiRequest<PaginatedResponse<ExpenseDto> & { summary: ExpensesSummaryDto }>(
+    `/expenses${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+      search: query.search,
+      categoryId: query.categoryId,
+      batchId: query.batchId,
+      status: query.status,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+export function createExpense(input: CreateExpenseInput): Promise<ExpenseDto> {
+  return apiRequest<ExpenseDto>('/expenses', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function voidExpense(id: number, reason: string): Promise<ExpenseDto> {
+  return apiRequest<ExpenseDto>(`/expenses/${id}/void`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// --- Payroll API ---
+export function fetchEmployees(
+  query: Partial<ListEmployeesQuery> = {},
+): Promise<PaginatedResponse<EmployeeDto>> {
+  return apiRequest<PaginatedResponse<EmployeeDto>>(
+    `/payroll/employees${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      search: query.search,
+      payType: query.payType,
+      isActive: query.isActive !== undefined ? String(query.isActive) : undefined,
+    })}`,
+  );
+}
+
+export function createEmployee(input: CreateEmployeeInput): Promise<EmployeeDto> {
+  return apiRequest<EmployeeDto>('/payroll/employees', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateEmployee(id: number, input: UpdateEmployeeInput): Promise<EmployeeDto> {
+  return apiRequest<EmployeeDto>(`/payroll/employees/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchSalaryAdvances(
+  query: Partial<ListSalaryAdvancesQuery> = {},
+): Promise<PaginatedResponse<SalaryAdvanceDto>> {
+  return apiRequest<PaginatedResponse<SalaryAdvanceDto>>(
+    `/payroll/advances${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      search: query.search,
+      employeeId: query.employeeId,
+      status: query.status,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+export function createSalaryAdvance(input: CreateSalaryAdvanceInput): Promise<SalaryAdvanceDto> {
+  return apiRequest<SalaryAdvanceDto>('/payroll/advances', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function voidSalaryAdvance(id: number, reason: string): Promise<SalaryAdvanceDto> {
+  return apiRequest<SalaryAdvanceDto>(`/payroll/advances/${id}/void`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function fetchSalaryRecords(
+  query: Partial<ListSalaryRecordsQuery> = {},
+): Promise<PaginatedResponse<SalaryRecordDto>> {
+  return apiRequest<PaginatedResponse<SalaryRecordDto>>(
+    `/payroll/salaries${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      search: query.search,
+      employeeId: query.employeeId,
+      periodMonth: query.periodMonth,
+      payType: query.payType,
+      status: query.status,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+export function createSalaryRecord(input: CreateSalaryRecordInput): Promise<SalaryRecordDto> {
+  return apiRequest<SalaryRecordDto>('/payroll/salaries', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function voidSalaryRecord(id: number, reason: string): Promise<SalaryRecordDto> {
+  return apiRequest<SalaryRecordDto>(`/payroll/salaries/${id}/void`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function fetchNetProfitSummary(
+  query: Partial<NetProfitQuery> = {},
+): Promise<NetProfitSummaryDto> {
+  return apiRequest<NetProfitSummaryDto>(
+    `/payroll/net-profit-summary${buildQueryString({
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+// ============================================================================
+// Phase 10: Dashboard & Reports API
+// ============================================================================
+
+export function fetchDashboardReport(
+  query: Partial<DashboardQueryInput> = {},
+): Promise<DashboardResponseDto> {
+  return apiRequest<DashboardResponseDto>(
+    `/reports/dashboard${buildQueryString({
+      preset: query.preset,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+export function fetchDetailedSalesReport(
+  query: Partial<DetailedSalesReportQueryInput> = {},
+): Promise<DetailedSalesReportResponseDto> {
+  return apiRequest<DetailedSalesReportResponseDto>(
+    `/reports/detailed-sales${buildQueryString({
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      batchId: query.batchId,
+      clientId: query.clientId,
+      itemId: query.itemId,
+      routeId: query.routeId,
+      salespersonId: query.salespersonId,
+      paymentStatus: query.paymentStatus,
+      search: query.search,
+    })}`,
+  );
+}
+
+export function fetchOtherReportsSummary(
+  query: Partial<OtherReportsQueryInput> = {},
+): Promise<OtherReportsResponseDto> {
+  return apiRequest<OtherReportsResponseDto>(
+    `/reports/summary${buildQueryString({
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+// ============================================================================
+// Phase 11: Notifications API
+// ============================================================================
+
+export function fetchNotifications(
+  query: Partial<ListNotificationsQuery> = {},
+): Promise<NotificationsListResponseDto> {
+  return apiRequest<NotificationsListResponseDto>(
+    `/notifications${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      type: query.type,
+      severity: query.severity,
+      unreadOnly: query.unreadOnly,
+      search: query.search,
+    })}`,
+  );
+}
+
+export function triggerNotificationScan(): Promise<RunNotificationScanResultDto> {
+  return apiRequest<RunNotificationScanResultDto>('/notifications/scan', {
+    method: 'POST',
+  });
+}
+
+export function markNotificationRead(id: number): Promise<NotificationDto> {
+  return apiRequest<NotificationDto>(`/notifications/${id}/read`, {
+    method: 'POST',
+  });
+}
+
+export function markAllNotificationsRead(): Promise<{ count: number }> {
+  return apiRequest<{ count: number }>('/notifications/read-all', {
+    method: 'POST',
   });
 }

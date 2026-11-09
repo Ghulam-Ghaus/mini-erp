@@ -67,7 +67,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
     date: '2026-11-01',
     client: 'Gohar Traders',
     batch: 'Batch 1',
-    item: 'Daal Chana',
+    item: 'name',
     qtyKg: '100.000',
     costRate: '68.75',
     saleRate: '80.00',
@@ -81,7 +81,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
     date: '2026-11-02',
     client: 'Al-Madina Store',
     batch: 'Batch 1',
-    item: 'Daal Chana',
+    item: 'name',
     qtyKg: '250.000',
     costRate: '68.75',
     saleRate: '82.00',
@@ -93,7 +93,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
     id: 3,
     invoiceNo: 'INV-2026-0003',
     date: '2026-11-03',
-    client: 'Bismillah Kiryana',
+    client: 'Client Business name',
     batch: 'Batch 2',
     item: 'Daal Masoor',
     qtyKg: '150.500',
@@ -136,7 +136,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
 const CLIENT_OPTIONS = [
   { value: 'Gohar Traders', label: 'Gohar Traders', subtitle: 'Saddar Route' },
   { value: 'Al-Madina Store', label: 'Al-Madina Store', subtitle: 'City Route' },
-  { value: 'Bismillah Kiryana', label: 'Bismillah Kiryana', subtitle: 'Mandi Route' },
+  { value: 'Client Business name', label: 'Client Business name', subtitle: 'Mandi Route' },
   { value: 'Saddar Wholesale', label: 'Saddar Wholesale', subtitle: 'Saddar Route' },
 ] as const;
 
@@ -147,7 +147,7 @@ const ROUTE_OPTIONS = [
 ] as const;
 
 const BATCH_COSTS: Record<string, { readonly item: string; readonly costRate: string }> = {
-  'Batch 1': { item: 'Daal Chana', costRate: '68.75' },
+  'Batch 1': { item: 'name', costRate: '68.75' },
   'Batch 2': { item: 'Daal Masoor', costRate: '95.00' },
   'Batch 3': { item: 'Daal Moong', costRate: '120.00' },
 };
@@ -204,7 +204,7 @@ export function DemoShowcaseScreen() {
     {
       key: 'line-1',
       batch: 'Batch 1',
-      item: 'Daal Chana',
+      item: 'name',
       qtyKg: '100.000',
       costRate: '68.75',
       saleRate: '80.00',
@@ -507,7 +507,7 @@ export function DemoShowcaseScreen() {
       const firstLine: DemoLineItem = lines[0] ?? {
         key: 'line-default',
         batch: 'Batch 1',
-        item: 'Daal Chana',
+        item: 'name',
         qtyKg: '100.000',
         costRate: '68.75',
         saleRate: '80.00',
@@ -710,7 +710,7 @@ export function DemoShowcaseScreen() {
                   {
                     key: `line-${Date.now()}-${prev.length}`,
                     batch: 'Batch 1',
-                    item: 'Daal Chana',
+                    item: 'name',
                     qtyKg: '50.000',
                     costRate: '68.75',
                     saleRate: '80.00',

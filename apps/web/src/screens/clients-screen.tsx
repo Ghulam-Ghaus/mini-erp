@@ -462,7 +462,7 @@ export function ClientsScreen({
         >
           <FormField label="Client Name (English)" required>
             <TextInput
-              placeholder="e.g. Bismillah Kiryana Store"
+              placeholder="e.g. Client Business name Store"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -472,7 +472,7 @@ export function ClientsScreen({
             <TextInput
               dir="rtl"
               className="font-urdu"
-              placeholder="بسم اللہ کریانہ سٹور"
+              placeholder="کلا ینٹ بزنس نام سٹور"
               value={nameUr}
               onChange={(e) => setNameUr(e.target.value)}
             />

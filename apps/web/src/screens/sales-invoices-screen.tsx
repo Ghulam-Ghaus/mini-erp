@@ -41,6 +41,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Decimal } from 'decimal.js';
 import { useEffect, useMemo, useState } from 'react';
+import { PrintDocumentDialog, type PrintableDocument } from '../components/print-document-dialog';
 import {
   createSale,
   fetchBatches,
@@ -145,6 +146,7 @@ export function SalesInvoicesScreen({
   const [detailSaleId, setDetailSaleId] = useState<number | null>(null);
   const [voidTarget, setVoidTarget] = useState<SaleInvoiceDto | null>(null);
   const [voidReason, setVoidReason] = useState('');
+  const [printDoc, setPrintDoc] = useState<PrintableDocument | null>(null);
 
   // Reference Queries
   const clientsQuery = useQuery({
@@ -718,6 +720,12 @@ export function SalesInvoicesScreen({
           <RowActions
             actions={[
               {
+                id: 'print',
+                label: 'Print',
+                inline: true,
+                onClick: () => setPrintDoc({ type: 'SALE_INVOICE', data: row.original }),
+              },
+              {
                 id: 'view',
                 label: 'View',
                 inline: true,
@@ -1253,6 +1261,12 @@ export function SalesInvoicesScreen({
           </div>
         </div>
       </Dialog>
+
+      <PrintDocumentDialog
+        open={Boolean(printDoc)}
+        document={printDoc}
+        onClose={() => setPrintDoc(null)}
+      />
     </div>
   );
 }

@@ -60,7 +60,7 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "sale_return_items", "sale_returns", "sale_items", "sales_invoices", "clients", "routes", "batch_costs", "batch_sources", "batches", "attachments", "cheques", "payment_allocations", "payments", "ledger_entries", "stock_movements", "purchase_return_items", "purchase_returns", "purchase_items", "purchase_invoices", "item_units", "items", "suppliers", "number_sequences", "audit_logs", "role_permissions", "permissions", "users", "roles", "organizations", "id_counters" CASCADE',
+    'TRUNCATE TABLE "recovery_entries", "sale_return_items", "sale_returns", "sale_items", "sales_invoices", "clients", "routes", "batch_costs", "batch_sources", "batches", "attachments", "cheques", "payment_allocations", "payments", "ledger_entries", "stock_movements", "purchase_return_items", "purchase_returns", "purchase_items", "purchase_invoices", "item_units", "items", "suppliers", "number_sequences", "audit_logs", "role_permissions", "permissions", "users", "roles", "organizations", "id_counters" CASCADE',
   );
 });
 
@@ -103,8 +103,8 @@ async function seedTestEnvironment() {
     {
       routeId: route.id,
       code: 'CLI-01',
-      name: 'Bismillah Kiryana',
-      nameUr: 'بسم اللہ کریانہ',
+      name: 'Client Business name',
+      nameUr: 'کلا ینٹ بزنس نام',
       creditLimit: '100000.00',
       openingBalance: '0.00',
       phone: '03001234567',
@@ -120,7 +120,7 @@ async function seedTestEnvironment() {
   });
 
   const item = await itemsService.createItem(org.id, 1, {
-    name: 'Daal Chana Premium',
+    name: 'name Premium',
     baseUnit: 'KG',
     defaultTaxRate: '0.00',
     isActive: true,
@@ -156,7 +156,7 @@ async function seedTestEnvironment() {
   // Create Batch and allocate 100 kg at 100/kg (0% wastage -> output 100 kg, cost 100/kg)
   const purchaseItemId = purchase.items[0]!.id;
   const batch = await batchesService.createBatch(org.id, 1, {
-    name: 'Batch Daal Chana #1',
+    name: 'Batch #1',
     batchDate: '2026-11-02',
     status: 'OPEN',
     wastageMode: 'PERCENT',

@@ -46,7 +46,7 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "attachments", "cheques", "payment_allocations", "payments", "ledger_entries", "stock_movements", "purchase_return_items", "purchase_returns", "purchase_items", "purchase_invoices", "item_units", "items", "suppliers", "number_sequences", "audit_logs", "role_permissions", "permissions", "users", "roles", "organizations", "id_counters" CASCADE',
+    'TRUNCATE TABLE "recovery_entries", "attachments", "cheques", "payment_allocations", "payments", "ledger_entries", "stock_movements", "purchase_return_items", "purchase_returns", "purchase_items", "purchase_invoices", "item_units", "items", "suppliers", "number_sequences", "audit_logs", "role_permissions", "permissions", "users", "roles", "organizations", "id_counters" CASCADE',
   );
 });
 
@@ -82,7 +82,7 @@ describe('Phase 3: Suppliers, Items, Purchase Invoices, Supplier Ledger, Returns
     // 1. Create Item with Base Unit KG and Alternate Unit BAG = 50.000 KG
     const daalChana = await itemsService.createItem(orgId, 1, {
       code: 'DC-01',
-      name: 'Daal Chana',
+      name: 'name',
       nameUr: 'دال چنا',
       category: 'Pulses',
       baseUnit: 'KG',

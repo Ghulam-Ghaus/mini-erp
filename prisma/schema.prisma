@@ -59,6 +59,14 @@ model Organization {
   clients          Client[]
   salesInvoices    SaleInvoice[]
   saleReturns      SaleReturn[]
+  recoveryEntries   RecoveryEntry[]
+  challans          Challan[]
+  expenseCategories ExpenseCategory[]
+  expenses          Expense[]
+  employees         Employee[]
+  salaryAdvances    SalaryAdvance[]
+  salaryRecords     SalaryRecord[]
+  notifications     Notification[]
 
   @@map("organizations")
 }
@@ -121,6 +129,7 @@ model User {
   role         Role         @relation(fields: [roleId], references: [id])
   auditLogs    AuditLog[]
   assignedRoutes Route[]    @relation("OfficerRoutes")
+  recoveryEntries RecoveryEntry[] @relation("OfficerRecoveryEntries")
 
   @@index([organizationId])
   @@index([roleId])
@@ -248,6 +257,7 @@ model PurchaseInvoice {
   paidAmount     Decimal   @default(0) @map("paid_amount") @db.Decimal(14, 2)
   returnedAmount Decimal   @default(0) @map("returned_amount") @db.Decimal(14, 2)
   status         String    @default("POSTED")
+  printCount     Int       @default(0) @map("print_count")
   notes          String?
   voidReason     String?   @map("void_reason")
   voidedAt       DateTime? @map("voided_at")
@@ -410,8 +420,10 @@ model Batch {
   sources      BatchSource[]
   costs        BatchCost[]
   movements    StockMovement[]
-  saleItems    SaleItem[]
+  saleItems       SaleItem[]
   saleReturnItems SaleReturnItem[]
+  expenses        Expense[]
+  salaryRecords   SalaryRecord[]
 
   @@unique([organizationId, batchNo])
   @@index([organizationId, status])
@@ -500,6 +512,7 @@ model Payment {
   bankName       String?   @map("bank_name")
   chequeDate     DateTime? @map("cheque_date")
   status         String    @default("POSTED")
+  printCount     Int       @default(0) @map("print_count")
   notes          String?
   voidReason     String?   @map("void_reason")
   voidedAt       DateTime? @map("voided_at")
@@ -511,6 +524,7 @@ model Payment {
   organization Organization        @relation(fields: [organizationId], references: [id])
   allocations  PaymentAllocation[]
   cheque       Cheque?
+  recoveryEntry RecoveryEntry?
 
   @@unique([organizationId, paymentNo])
   @@index([organizationId, partyType, partyId])
@@ -596,6 +610,7 @@ model Route {
   assignedOfficer User?         @relation("OfficerRoutes", fields: [assignedOfficerId], references: [id])
   clients         Client[]
   salesInvoices   SaleInvoice[]
+  recoveryEntries RecoveryEntry[]
 
   @@unique([organizationId, name])
   @@index([organizationId, isActive])
@@ -603,33 +618,66 @@ model Route {
 }
 
 model Client {
-  id             Int      @id
-  organizationId Int      @map("organization_id")
-  routeId        Int?     @map("route_id")
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  routeId        Int?      @map("route_id")
   code           String?
   name           String
-  nameUr         String?  @map("name_ur")
-  contactPerson  String?  @map("contact_person")
+  nameUr         String?   @map("name_ur")
+  contactPerson  String?   @map("contact_person")
   phone          String?
   address        String?
-  taxNo          String?  @map("tax_no")
-  creditLimit    Decimal  @default(0) @map("credit_limit") @db.Decimal(14, 2)
-  openingBalance Decimal  @default(0) @map("opening_balance") @db.Decimal(14, 2)
-  recoveryDay    String?  @map("recovery_day")
+  taxNo          String?   @map("tax_no")
+  creditLimit    Decimal   @default(0) @map("credit_limit") @db.Decimal(14, 2)
+  openingBalance Decimal   @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  recoveryDay    String?   @map("recovery_day")
+  promisedDate   DateTime? @map("promised_date")
+  promisedAmount Decimal?  @map("promised_amount") @db.Decimal(14, 2)
   notes          String?
-  isActive       Boolean  @default(true) @map("is_active")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  organization  Organization  @relation(fields: [organizationId], references: [id])
-  route         Route?        @relation(fields: [routeId], references: [id])
-  salesInvoices SaleInvoice[]
-  saleReturns   SaleReturn[]
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  route           Route?          @relation(fields: [routeId], references: [id])
+  salesInvoices   SaleInvoice[]
+  saleReturns     SaleReturn[]
+  recoveryEntries RecoveryEntry[]
 
   @@index([organizationId, isActive])
   @@index([organizationId, name])
   @@index([organizationId, routeId])
+  @@index([organizationId, promisedDate])
   @@map("clients")
+}
+
+model RecoveryEntry {
+  id               Int       @id
+  organizationId   Int       @map("organization_id")
+  clientId         Int       @map("client_id")
+  routeId          Int?      @map("route_id")
+  officerId        Int       @map("officer_id")
+  visitDate        DateTime  @map("visit_date")
+  outcome          String
+  amount           Decimal   @default(0) @db.Decimal(14, 2)
+  method           String?
+  paymentId        Int?      @unique @map("payment_id")
+  nextPromisedDate DateTime? @map("next_promised_date")
+  promisedAmount   Decimal?  @map("promised_amount") @db.Decimal(14, 2)
+  remarks          String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  client       Client       @relation(fields: [clientId], references: [id])
+  route        Route?       @relation(fields: [routeId], references: [id])
+  officer      User         @relation("OfficerRecoveryEntries", fields: [officerId], references: [id])
+  payment      Payment?     @relation(fields: [paymentId], references: [id])
+
+  @@index([organizationId, visitDate])
+  @@index([organizationId, clientId])
+  @@index([organizationId, officerId])
+  @@index([organizationId, outcome])
+  @@map("recovery_entries")
 }
 
 model SaleInvoice {
@@ -649,6 +697,7 @@ model SaleInvoice {
   paidAmount     Decimal   @default(0) @map("paid_amount") @db.Decimal(14, 2)
   returnedAmount Decimal   @default(0) @map("returned_amount") @db.Decimal(14, 2)
   status         String    @default("POSTED")
+  printCount     Int       @default(0) @map("print_count")
   notes          String?
   voidReason     String?   @map("void_reason")
   voidedAt       DateTime? @map("voided_at")
@@ -662,6 +711,7 @@ model SaleInvoice {
   route        Route?        @relation(fields: [routeId], references: [id])
   items        SaleItem[]
   returns      SaleReturn[]
+  challans     Challan[]
 
   @@unique([organizationId, invoiceNo])
   @@index([organizationId, saleDate])
@@ -719,6 +769,7 @@ model SaleReturn {
   total          Decimal   @default(0) @db.Decimal(14, 2)
   settlementType String    @default("ADJUST_BALANCE") @map("settlement_type")
   status         String    @default("POSTED")
+  printCount     Int       @default(0) @map("print_count")
   voidReason     String?   @map("void_reason")
   voidedAt       DateTime? @map("voided_at")
   voidedById     Int?      @map("voided_by_id")
@@ -767,4 +818,201 @@ model SaleReturnItem {
   @@index([batchId])
   @@index([itemId])
   @@map("sale_return_items")
+}
+
+model Challan {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  challanNo      String    @map("challan_no")
+  saleId         Int       @map("sale_id")
+  challanDate    DateTime  @map("challan_date")
+  riderName      String?   @map("rider_name")
+  vehicleNo      String?   @map("vehicle_no")
+  status         String    @default("PENDING")
+  dispatchedAt   DateTime? @map("dispatched_at")
+  deliveredAt    DateTime? @map("delivered_at")
+  receivedBy     String?   @map("received_by")
+  notes          String?
+  printCount     Int       @default(0) @map("print_count")
+  cancelReason   String?   @map("cancel_reason")
+  createdById    Int       @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  sale         SaleInvoice  @relation(fields: [saleId], references: [id])
+
+  @@unique([organizationId, challanNo])
+  @@index([organizationId, challanDate])
+  @@index([organizationId, status])
+  @@index([saleId])
+  @@map("challans")
+}
+
+model ExpenseCategory {
+  id             Int      @id
+  organizationId Int      @map("organization_id")
+  name           String
+  nameUr         String?  @map("name_ur")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  expenses     Expense[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@map("expense_categories")
+}
+
+model Expense {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  expenseNo      String    @map("expense_no")
+  expenseDate    DateTime  @map("expense_date")
+  categoryId     Int       @map("category_id")
+  amount         Decimal   @db.Decimal(14, 2)
+  method         String    @default("CASH")
+  referenceNo    String?   @map("reference_no")
+  paidTo         String?   @map("paid_to")
+  batchId        Int?      @map("batch_id")
+  batchCostId    Int?      @map("batch_cost_id")
+  description    String
+  status         String    @default("POSTED")
+  voidReason     String?   @map("void_reason")
+  voidedAt       DateTime? @map("voided_at")
+  voidedById     Int?      @map("voided_by_id")
+  createdById    Int       @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  category     ExpenseCategory @relation(fields: [categoryId], references: [id])
+  batch        Batch?          @relation(fields: [batchId], references: [id])
+
+  @@unique([organizationId, expenseNo])
+  @@index([organizationId, expenseDate])
+  @@index([organizationId, categoryId])
+  @@index([organizationId, status])
+  @@index([batchId])
+  @@map("expenses")
+}
+
+model Employee {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  code           String?
+  name           String
+  nameUr         String?   @map("name_ur")
+  cnic           String?
+  phone          String?
+  address        String?
+  designation    String?
+  payType        String    @default("FIXED_MONTHLY") @map("pay_type")
+  baseRate       Decimal   @default(0) @map("base_rate") @db.Decimal(14, 2)
+  joinDate       DateTime? @map("join_date")
+  isActive       Boolean   @default(true) @map("is_active")
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  salaryAdvances SalaryAdvance[]
+  salaryRecords  SalaryRecord[]
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, name])
+  @@map("employees")
+}
+
+model SalaryAdvance {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  advanceNo      String    @map("advance_no")
+  employeeId     Int       @map("employee_id")
+  advanceDate    DateTime  @map("advance_date")
+  amount         Decimal   @db.Decimal(14, 2)
+  settledAmount  Decimal   @default(0) @map("settled_amount") @db.Decimal(14, 2)
+  method         String    @default("CASH")
+  notes          String?
+  status         String    @default("POSTED")
+  voidReason     String?   @map("void_reason")
+  voidedAt       DateTime? @map("voided_at")
+  voidedById     Int?      @map("voided_by_id")
+  createdById    Int       @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+
+  @@unique([organizationId, advanceNo])
+  @@index([organizationId, employeeId, status])
+  @@index([organizationId, advanceDate])
+  @@map("salary_advances")
+}
+
+model SalaryRecord {
+  id               Int       @id
+  organizationId   Int       @map("organization_id")
+  salaryNo         String    @map("salary_no")
+  employeeId       Int       @map("employee_id")
+  periodMonth      String    @map("period_month")
+  paymentDate      DateTime  @map("payment_date")
+  payType          String    @map("pay_type")
+  unitsWorked      Decimal   @default(1) @map("units_worked") @db.Decimal(12, 3)
+  rateApplied      Decimal   @map("rate_applied") @db.Decimal(14, 2)
+  basicAmount      Decimal   @map("basic_amount") @db.Decimal(14, 2)
+  overtimeAmount   Decimal   @default(0) @map("overtime_amount") @db.Decimal(14, 2)
+  bonusAmount      Decimal   @default(0) @map("bonus_amount") @db.Decimal(14, 2)
+  deductionsAmount Decimal   @default(0) @map("deductions_amount") @db.Decimal(14, 2)
+  advanceDeducted  Decimal   @default(0) @map("advance_deducted") @db.Decimal(14, 2)
+  netAmount        Decimal   @map("net_amount") @db.Decimal(14, 2)
+  batchId          Int?      @map("batch_id")
+  batchCostId      Int?      @map("batch_cost_id")
+  method           String    @default("CASH")
+  notes            String?
+  status           String    @default("POSTED")
+  voidReason       String?   @map("void_reason")
+  voidedAt         DateTime? @map("voided_at")
+  voidedById       Int?      @map("voided_by_id")
+  createdById      Int       @map("created_by_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  employee     Employee     @relation(fields: [employeeId], references: [id])
+  batch        Batch?       @relation(fields: [batchId], references: [id])
+
+  @@unique([organizationId, salaryNo])
+  @@index([organizationId, employeeId])
+  @@index([organizationId, paymentDate])
+  @@index([organizationId, periodMonth])
+  @@index([batchId])
+  @@map("salary_records")
+}
+
+model Notification {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  type           String
+  severity       String    @default("WARNING")
+  title          String
+  body           String
+  dueAt          DateTime? @map("due_at")
+  isRead         Boolean   @default(false) @map("is_read")
+  readAt         DateTime? @map("read_at")
+  userId         Int?      @map("user_id")
+  refType        String?   @map("ref_type")
+  refId          Int?      @map("ref_id")
+  dedupeKey      String    @map("dedupe_key")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, isRead, createdAt])
+  @@index([organizationId, type])
+  @@map("notifications")
 }

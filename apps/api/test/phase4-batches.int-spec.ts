@@ -48,7 +48,7 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "batch_costs", "batch_sources", "batches", "attachments", "cheques", "payment_allocations", "payments", "ledger_entries", "stock_movements", "purchase_return_items", "purchase_returns", "purchase_items", "purchase_invoices", "item_units", "items", "suppliers", "number_sequences", "audit_logs", "role_permissions", "permissions", "users", "roles", "organizations", "id_counters" CASCADE',
+    'TRUNCATE TABLE "recovery_entries", "batch_costs", "batch_sources", "batches", "attachments", "cheques", "payment_allocations", "payments", "ledger_entries", "stock_movements", "purchase_return_items", "purchase_returns", "purchase_items", "purchase_invoices", "item_units", "items", "suppliers", "number_sequences", "audit_logs", "role_permissions", "permissions", "users", "roles", "organizations", "id_counters" CASCADE',
   );
 });
 
@@ -77,7 +77,7 @@ async function seedPurchaseSetup() {
 
   const item = await itemsService.createItem(org.id, 1, {
     code: 'DC-01',
-    name: 'Daal Chana',
+    name: 'name',
     nameUr: 'دال چنا',
     category: 'Pulses',
     baseUnit: 'KG',
@@ -144,7 +144,7 @@ describe('Phase 4: Batches, Purchase Allocations, Extra Costs, Wastage %, Stock 
     //    Planned wastage = 2.500% -> 15.000 kg -> Output = 585.000 kg
     //    Cost per kg = 40,425.00 / 585.000 = 69.10
     const batch = await batchesService.createBatch(orgId, 1, {
-      name: 'Daal Chana — Lot A',
+      name: 'name — Lot A',
       nameUr: 'دال چنا — لاٹ اے',
       itemId,
       batchDate: '2026-11-06',

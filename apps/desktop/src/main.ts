@@ -1,5 +1,11 @@
-import { DESKTOP_CONFIG_CHANNEL, HEALTH_PATH, type DesktopBridge } from '@mini-erp/shared';
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import {
+  DESKTOP_CONFIG_CHANNEL,
+  DESKTOP_NOTIFY_CHANNEL,
+  HEALTH_PATH,
+  type DesktopBridge,
+  type DesktopNotificationPayload,
+} from '@mini-erp/shared';
+import { app, BrowserWindow, dialog, ipcMain, Notification } from 'electron';
 import { watch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import { ApiProcess } from './api-process.js';
@@ -34,6 +40,15 @@ function webOrigin(): string {
 ipcMain.on(DESKTOP_CONFIG_CHANNEL, (event) => {
   const config: DesktopBridge = { apiBaseUrl, platform: process.platform };
   event.returnValue = config;
+});
+
+ipcMain.on(DESKTOP_NOTIFY_CHANNEL, (_event, payload: DesktopNotificationPayload) => {
+  if (Notification.isSupported()) {
+    new Notification({
+      title: payload.title,
+      body: payload.body,
+    }).show();
+  }
 });
 
 async function startApi(): Promise<void> {

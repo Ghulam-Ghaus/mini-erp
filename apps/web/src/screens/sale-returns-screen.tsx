@@ -39,6 +39,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Decimal } from 'decimal.js';
 import { useEffect, useMemo, useState } from 'react';
+import { PrintDocumentDialog, type PrintableDocument } from '../components/print-document-dialog';
 import {
   createSaleReturn,
   fetchClients,
@@ -111,6 +112,7 @@ export function SaleReturnsScreen({
   const [detailReturn, setDetailReturn] = useState<SaleReturnDto | null>(null);
   const [voidTarget, setVoidTarget] = useState<SaleReturnDto | null>(null);
   const [voidReason, setVoidReason] = useState('');
+  const [printDoc, setPrintDoc] = useState<PrintableDocument | null>(null);
 
   const clientsQuery = useQuery({
     queryKey: ['clients', 'dropdown'],
@@ -417,6 +419,12 @@ export function SaleReturnsScreen({
         cell: ({ row }) => (
           <RowActions
             actions={[
+              {
+                id: 'print',
+                label: 'Print',
+                inline: true,
+                onClick: () => setPrintDoc({ type: 'SALE_RETURN', data: row.original }),
+              },
               {
                 id: 'view',
                 label: 'View',
@@ -831,6 +839,12 @@ export function SaleReturnsScreen({
           </div>
         </div>
       </Dialog>
+
+      <PrintDocumentDialog
+        open={Boolean(printDoc)}
+        document={printDoc}
+        onClose={() => setPrintDoc(null)}
+      />
     </div>
   );
 }

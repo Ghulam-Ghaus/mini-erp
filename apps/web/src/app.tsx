@@ -29,20 +29,27 @@ import {
   changeCurrentPin,
   fetchCurrentSession,
   fetchHealth,
+  fetchNotifications,
   fetchSetupStatus,
   getStoredToken,
   setStoredToken,
 } from './lib/api.js';
 import { DashboardScreen } from './screens/dashboard-screen.js';
 import { BatchesScreen } from './screens/batches-screen.js';
+import { ChallansScreen } from './screens/challans-screen.js';
 import { Client360Screen } from './screens/client-360-screen.js';
 import { ClientsScreen } from './screens/clients-screen.js';
+import { ExpensesScreen } from './screens/expenses-screen.js';
 import { InventoryScreen } from './screens/inventory-screen.js';
 import { ItemsScreen } from './screens/items-screen.js';
 import { LockScreen, LoginScreen } from './screens/login-screen.js';
+import { NotificationsScreen } from './screens/notifications-screen.js';
 import { PaymentsChequesScreen } from './screens/payments-cheques-screen.js';
+import { PayrollScreen } from './screens/payroll-screen.js';
 import { PurchaseInvoicesScreen } from './screens/purchase-invoices-screen.js';
 import { PurchaseReturnsScreen } from './screens/purchase-returns-screen.js';
+import { RecoveryScreen } from './screens/recovery-screen.js';
+import { ReportsScreen } from './screens/reports-screen.js';
 import { RoutesScreen } from './screens/routes-screen.js';
 import { SaleReturnsScreen } from './screens/sale-returns-screen.js';
 import { SalesInvoicesScreen } from './screens/sales-invoices-screen.js';
@@ -105,6 +112,14 @@ function RootApplication() {
     enabled: Boolean(setupStatus.data?.isInitialized && hasToken),
     retry: false,
   });
+
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: () => fetchNotifications({ pageSize: 10, unreadOnly: true }),
+    enabled: Boolean(hasToken && sessionQuery.data),
+    refetchInterval: 60_000,
+  });
+  const unreadNotificationsCount = notificationsQuery.data?.unreadCount ?? 0;
 
   useEffect(() => {
     if (sessionQuery.isError && hasToken) {
@@ -303,7 +318,12 @@ function RootApplication() {
       items.push({ id: 'reports', label: t('nav.reports'), icon: <DotIcon /> });
     }
     if (can('notifications', 'view')) {
-      items.push({ id: 'notifications', label: t('nav.notifications'), icon: <DotIcon /> });
+      items.push({
+        id: 'notifications',
+        label: t('nav.notifications'),
+        icon: <DotIcon />,
+        badgeCount: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined,
+      });
     }
     if (can('users', 'view')) {
       items.push({ id: 'users-roles', label: t('nav.usersRoles'), icon: <DotIcon /> });
@@ -312,7 +332,7 @@ function RootApplication() {
       items.push({ id: 'settings', label: t('nav.settings'), icon: <DotIcon /> });
     }
     return items;
-  }, [t, can]);
+  }, [t, can, unreadNotificationsCount]);
 
   const commandItems: readonly CommandPaletteItem[] = useMemo(
     () => [
@@ -413,7 +433,7 @@ function RootApplication() {
       onUserMenuAction={handleUserMenuAction}
       onOpenSearch={() => setCommandOpen(true)}
       onToggleLanguage={toggleLanguage}
-      notificationCount={0}
+      notificationCount={unreadNotificationsCount}
       statusBanner={statusBadge}
       labels={{
         appName: displayOrgName,
@@ -658,6 +678,36 @@ function RootApplication() {
         />
       ) : activeNavId === 'routes' && can('clients', 'view') ? (
         <RoutesScreen canCreate={can('clients', 'create')} canEdit={can('clients', 'edit')} />
+      ) : activeNavId === 'challans' && can('sales', 'view') ? (
+        <ChallansScreen />
+      ) : activeNavId === 'expenses' && can('expenses', 'view') ? (
+        <ExpensesScreen />
+      ) : activeNavId === 'payroll' && can('payroll', 'view') ? (
+        <PayrollScreen />
+      ) : activeNavId === 'reports' && can('reports', 'view') ? (
+        <ReportsScreen />
+      ) : activeNavId === 'notifications' && can('notifications', 'view') ? (
+        <NotificationsScreen onNavigate={setActiveNavId} />
+      ) : (activeNavId === 'recovery' ||
+          activeNavId === 'todays-recovery' ||
+          activeNavId === 'recovery-entries' ||
+          activeNavId === 'recovery-schedule') &&
+        can('recovery', 'view') ? (
+        <RecoveryScreen
+          activeSubView={
+            activeNavId === 'recovery-entries'
+              ? 'recovery-entries'
+              : activeNavId === 'recovery-schedule'
+                ? 'recovery-schedule'
+                : 'todays-recovery'
+          }
+          onChangeSubView={(sub) => setActiveNavId(sub)}
+          canCreate={can('recovery', 'create')}
+          onOpenClient360={(cId) => {
+            setSelectedClientIdFor360(cId);
+            setActiveNavId('client-ledger');
+          }}
+        />
       ) : (
         <DashboardScreen
           orgName={displayOrgName}
