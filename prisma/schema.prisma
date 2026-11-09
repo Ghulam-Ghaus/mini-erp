@@ -53,6 +53,7 @@ model Organization {
   stockMovements   StockMovement[]
   ledgerEntries    LedgerEntry[]
   payments         Payment[]
+  cheques          Cheque[]
   attachments      Attachment[]
   routes           Route[]
   clients          Client[]
@@ -509,11 +510,43 @@ model Payment {
 
   organization Organization        @relation(fields: [organizationId], references: [id])
   allocations  PaymentAllocation[]
+  cheque       Cheque?
 
   @@unique([organizationId, paymentNo])
   @@index([organizationId, partyType, partyId])
   @@index([organizationId, paymentDate])
   @@map("payments")
+}
+
+model Cheque {
+  id             Int       @id
+  organizationId Int       @map("organization_id")
+  paymentId      Int       @unique @map("payment_id")
+  direction      String
+  partyType      String    @map("party_type")
+  partyId        Int       @map("party_id")
+  chequeNo       String    @map("cheque_no")
+  bankName       String    @map("bank_name")
+  chequeDate     DateTime  @map("cheque_date")
+  amount         Decimal   @db.Decimal(14, 2)
+  status         String    @default("RECEIVED")
+  depositDate    DateTime? @map("deposit_date")
+  depositBank    String?   @map("deposit_bank")
+  clearedDate    DateTime? @map("cleared_date")
+  bouncedDate    DateTime? @map("bounced_date")
+  bounceReason   String?   @map("bounce_reason")
+  bounceFee      Decimal   @default(0) @map("bounce_fee") @db.Decimal(14, 2)
+  notes          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  payment      Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, chequeDate])
+  @@index([organizationId, partyType, partyId])
+  @@map("cheques")
 }
 
 model PaymentAllocation {

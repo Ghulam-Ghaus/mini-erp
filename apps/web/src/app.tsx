@@ -40,7 +40,7 @@ import { ClientsScreen } from './screens/clients-screen.js';
 import { InventoryScreen } from './screens/inventory-screen.js';
 import { ItemsScreen } from './screens/items-screen.js';
 import { LockScreen, LoginScreen } from './screens/login-screen.js';
-import { PaymentsOutScreen } from './screens/payments-out-screen.js';
+import { PaymentsChequesScreen } from './screens/payments-cheques-screen.js';
 import { PurchaseInvoicesScreen } from './screens/purchase-invoices-screen.js';
 import { PurchaseReturnsScreen } from './screens/purchase-returns-screen.js';
 import { RoutesScreen } from './screens/routes-screen.js';
@@ -83,6 +83,10 @@ function RootApplication() {
   const [prefillClientForSale, setPrefillClientForSale] = useState<number | null>(null);
   const [inspectSaleId, setInspectSaleId] = useState<number | null>(null);
   const [prefillSaleForReturn, setPrefillSaleForReturn] = useState<number | null>(null);
+  const [prefillReceiptContext, setPrefillReceiptContext] = useState<{
+    clientId: number;
+    saleId?: number;
+  } | null>(null);
 
   const health = useQuery({
     queryKey: ['health'],
@@ -543,12 +547,26 @@ function RootApplication() {
           }}
         />
       ) : activeNavId === 'payments-cheques' && can('payments', 'view') ? (
-        <PaymentsOutScreen
+        <PaymentsChequesScreen
           canCreate={can('payments', 'create')}
+          canEdit={can('payments', 'edit')}
           canVoid={can('payments', 'delete')}
+          prefillClientId={prefillReceiptContext?.clientId ?? null}
+          prefillSaleId={prefillReceiptContext?.saleId ?? null}
           prefillSupplierId={prefillPaymentContext?.supplierId ?? null}
           prefillPurchaseId={prefillPaymentContext?.purchaseId ?? null}
-          onClearPrefill={() => setPrefillPaymentContext(null)}
+          onClearPrefill={() => {
+            setPrefillPaymentContext(null);
+            setPrefillReceiptContext(null);
+          }}
+          onOpenClient360={(cId) => {
+            setSelectedClientIdFor360(cId);
+            setActiveNavId('client-ledger');
+          }}
+          onViewSaleInvoice={(sId) => {
+            setInspectSaleId(sId);
+            setActiveNavId('sales-invoices');
+          }}
           onOpenSupplier360={(supId) => {
             setSelectedSupplierIdFor360(supId);
             setActiveNavId('supplier-ledger');
@@ -562,6 +580,7 @@ function RootApplication() {
         <SalesInvoicesScreen
           canCreate={can('sales', 'create')}
           canVoid={can('sales', 'delete')}
+          canReceivePayment={can('payments', 'create')}
           taxEnabled={session.organization.settings.taxEnabled}
           defaultTaxRate={session.organization.settings.defaultTaxRate}
           initialClientIdForNewSale={prefillClientForSale}
@@ -581,6 +600,10 @@ function RootApplication() {
           onCreateCreditNote={(sId) => {
             setPrefillSaleForReturn(sId);
             setActiveNavId('sale-returns');
+          }}
+          onReceivePayment={(cId, sId) => {
+            setPrefillReceiptContext({ clientId: cId, saleId: sId });
+            setActiveNavId('payments-cheques');
           }}
         />
       ) : activeNavId === 'sale-returns' && can('returns', 'view') ? (
@@ -615,9 +638,14 @@ function RootApplication() {
         <Client360Screen
           initialClientId={selectedClientIdFor360}
           canCreateSale={can('sales', 'create')}
+          canReceivePayment={can('payments', 'create')}
           onNewSale={(cId) => {
             setPrefillClientForSale(cId);
             setActiveNavId('sales-invoices');
+          }}
+          onReceivePayment={(cId) => {
+            setPrefillReceiptContext({ clientId: cId });
+            setActiveNavId('payments-cheques');
           }}
           onViewSaleInvoice={(sId) => {
             setInspectSaleId(sId);

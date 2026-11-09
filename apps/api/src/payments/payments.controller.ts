@@ -1,7 +1,11 @@
 import {
+  createClientPaymentSchema,
   createSupplierPaymentSchema,
+  listChequesQuerySchema,
   listPaymentsQuerySchema,
+  updateChequeStatusSchema,
   voidDocumentSchema,
+  type ChequeDto,
   type PaginatedResponse,
   type PaymentDto,
 } from '@mini-erp/shared';
@@ -29,6 +33,32 @@ export class PaymentsController {
   }
 
   @RequirePermission('payments', 'view')
+  @Get('cheques')
+  listCheques(
+    @CurrentUser() auth: RequestUserContext,
+    @Query() rawQuery: unknown,
+  ): Promise<PaginatedResponse<ChequeDto>> {
+    const query = parseWithZod(listChequesQuerySchema, rawQuery);
+    return this.paymentsService.listCheques(auth.user.organizationId, query);
+  }
+
+  @RequirePermission('payments', 'edit')
+  @Post('cheques/:id/status')
+  updateChequeStatus(
+    @CurrentUser() auth: RequestUserContext,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+  ): Promise<ChequeDto> {
+    const input = parseWithZod(updateChequeStatusSchema, body);
+    return this.paymentsService.updateChequeStatus(
+      auth.user.organizationId,
+      auth.user.id,
+      id,
+      input,
+    );
+  }
+
+  @RequirePermission('payments', 'view')
   @Get(':id')
   getPayment(
     @CurrentUser() auth: RequestUserContext,
@@ -49,6 +79,16 @@ export class PaymentsController {
       auth.user.id,
       input,
     );
+  }
+
+  @RequirePermission('payments', 'create')
+  @Post('client')
+  createClientPayment(
+    @CurrentUser() auth: RequestUserContext,
+    @Body() body: unknown,
+  ): Promise<PaymentDto> {
+    const input = parseWithZod(createClientPaymentSchema, body);
+    return this.paymentsService.createClientPayment(auth.user.organizationId, auth.user.id, input);
   }
 
   @RequirePermission('payments', 'delete')

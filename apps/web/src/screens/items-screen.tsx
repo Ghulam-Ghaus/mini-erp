@@ -528,7 +528,7 @@ export function ItemsScreen({ canCreate, canEdit }: ItemsScreenProps) {
           <FormField label={t('items.category')} htmlFor="item-category">
             <TextInput
               id="item-category"
-              placeholder="Daal / Pulses"
+              placeholder="Category Name"
               {...form.register('category')}
             />
           </FormField>

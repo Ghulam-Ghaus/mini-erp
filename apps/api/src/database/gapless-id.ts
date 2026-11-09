@@ -35,6 +35,7 @@ export const GAPLESS_TABLES = [
   'ledger_entries',
   'payments',
   'payment_allocations',
+  'cheques',
   'attachments',
   'batches',
   'batch_sources',

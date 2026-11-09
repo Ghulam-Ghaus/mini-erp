@@ -9,12 +9,14 @@ import {
   type BatchDetailDto,
   type BatchSummaryDto,
   type ChangePinInput,
+  type ChequeDto,
   type ClientDto,
   type ClientLedgerQuery,
   type ClientLedgerResponse,
   type CloseBatchInput,
   type CreateBatchInput,
   type CreateClientInput,
+  type CreateClientPaymentInput,
   type CreateItemInput,
   type CreatePurchaseInvoiceInput,
   type CreatePurchaseReturnInput,
@@ -27,6 +29,7 @@ import {
   type HealthResponse,
   type ItemDto,
   type ListBatchesQuery,
+  type ListChequesQuery,
   type ListClientsQuery,
   type ListItemsQuery,
   type ListPaymentsQuery,
@@ -54,6 +57,7 @@ import {
   type SupplierLedgerQuery,
   type SupplierLedgerResponse,
   type UpdateBatchWastageInput,
+  type UpdateChequeStatusInput,
   type UpdateClientInput,
   type UpdateItemInput,
   type UpdateOrganizationInput,
@@ -410,6 +414,40 @@ export function fetchPayments(
 
 export function createSupplierPayment(input: CreateSupplierPaymentInput): Promise<PaymentDto> {
   return apiRequest<PaymentDto>('/payments/supplier', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function createClientPayment(input: CreateClientPaymentInput): Promise<PaymentDto> {
+  return apiRequest<PaymentDto>('/payments/client', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchCheques(
+  query: Partial<ListChequesQuery>,
+): Promise<PaginatedResponse<ChequeDto>> {
+  return apiRequest<PaginatedResponse<ChequeDto>>(
+    `/payments/cheques${buildQueryString({
+      page: query.page,
+      pageSize: query.pageSize,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+      search: query.search,
+      direction: query.direction,
+      partyType: query.partyType,
+      partyId: query.partyId,
+      status: query.status,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+    })}`,
+  );
+}
+
+export function updateChequeStatus(id: number, input: UpdateChequeStatusInput): Promise<ChequeDto> {
+  return apiRequest<ChequeDto>(`/payments/cheques/${id}/status`, {
     method: 'POST',
     body: JSON.stringify(input),
   });

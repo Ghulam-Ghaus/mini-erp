@@ -85,6 +85,7 @@ function makeEmptySaleLine(defaultTaxRate = '0.00'): DraftSaleLine {
 export interface SalesInvoicesScreenProps {
   readonly canCreate: boolean;
   readonly canVoid: boolean;
+  readonly canReceivePayment?: boolean;
   readonly taxEnabled: boolean;
   readonly defaultTaxRate: string;
   readonly initialClientIdForNewSale?: number | null;
@@ -93,11 +94,13 @@ export interface SalesInvoicesScreenProps {
   readonly onOpenClient360: (clientId: number) => void;
   readonly onOpenBatchWorkspace: (batchId: number) => void;
   readonly onCreateCreditNote: (saleId: number) => void;
+  readonly onReceivePayment?: (clientId: number, saleId: number) => void;
 }
 
 export function SalesInvoicesScreen({
   canCreate,
   canVoid,
+  canReceivePayment = false,
   taxEnabled,
   defaultTaxRate,
   initialClientIdForNewSale,
@@ -106,6 +109,7 @@ export function SalesInvoicesScreen({
   onOpenClient360,
   onOpenBatchWorkspace,
   onCreateCreditNote,
+  onReceivePayment,
 }: SalesInvoicesScreenProps) {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -719,6 +723,19 @@ export function SalesInvoicesScreen({
                 inline: true,
                 onClick: () => setDetailSaleId(row.original.id),
               },
+              ...(canReceivePayment && onReceivePayment
+                ? [
+                    {
+                      id: 'receive-payment',
+                      label: 'Receive',
+                      inline: true,
+                      disabled:
+                        row.original.status === 'VOIDED' ||
+                        new Decimal(row.original.balanceDue).lte(0),
+                      onClick: () => onReceivePayment(row.original.clientId, row.original.id),
+                    },
+                  ]
+                : []),
               {
                 id: 'credit-note',
                 label: 'Credit Note',
@@ -741,7 +758,7 @@ export function SalesInvoicesScreen({
         ),
       },
     ],
-    [canVoid, onOpenClient360, onCreateCreditNote],
+    [canVoid, canReceivePayment, onReceivePayment, onOpenClient360, onCreateCreditNote],
   );
 
   const selectedClient = useMemo(() => clients.find((c) => c.id === clientId), [clients, clientId]);

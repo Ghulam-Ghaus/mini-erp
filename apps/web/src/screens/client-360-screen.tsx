@@ -6,6 +6,7 @@ import {
   type SortOrder,
 } from '@mini-erp/shared';
 import {
+  Button,
   Combobox,
   DataTable,
   FilterBar,
@@ -28,7 +29,9 @@ import { fetchClientLedger, fetchClients, fetchSaleReturns, fetchSales } from '.
 export interface Client360ScreenProps {
   readonly initialClientId?: number | null;
   readonly canCreateSale: boolean;
+  readonly canReceivePayment?: boolean;
   readonly onNewSale: (clientId: number) => void;
+  readonly onReceivePayment?: (clientId: number) => void;
   readonly onViewSaleInvoice: (saleId: number) => void;
   readonly onCreateCreditNote: (saleId: number) => void;
 }
@@ -36,7 +39,9 @@ export interface Client360ScreenProps {
 export function Client360Screen({
   initialClientId,
   canCreateSale,
+  canReceivePayment = false,
   onNewSale,
+  onReceivePayment,
   onViewSaleInvoice,
   onCreateCreditNote,
 }: Client360ScreenProps) {
@@ -372,6 +377,17 @@ export function Client360Screen({
           client
             ? `${client.routeName ? `Route: ${client.routeName} · ` : ''}${client.phone ?? 'No phone'} · Recovery: ${client.recoveryDay}`
             : 'Select a client to inspect append-only ledger, credit exposure, sales, and credit notes'
+        }
+        secondaryActions={
+          canReceivePayment && onReceivePayment && selectedClientId > 0 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onReceivePayment(selectedClientId)}
+            >
+              Receive Payment
+            </Button>
+          ) : undefined
         }
         primaryAction={
           canCreateSale && selectedClientId > 0
