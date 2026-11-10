@@ -52,11 +52,12 @@ export class SalesService {
     route?: { name: string } | null;
     createdByUser?: { firstName: string; lastName: string } | null;
     voidedByUser?: { firstName: string; lastName: string } | null;
+    challans?: { id: number; challanNo: string; status: string; printCount: number }[] | null;
     items: {
       id: number;
       saleId: number;
-      batchId: number;
-      itemId: number;
+      batchId: number | null;
+      itemId: number | null;
       enteredQty: Prisma.Decimal;
       enteredUnit: string;
       conversionFactor: Prisma.Decimal;
@@ -73,8 +74,8 @@ export class SalesService {
       lineProfit: Prisma.Decimal;
       returnedQtyBase: Prisma.Decimal;
       notes: string | null;
-      batch: { batchNo: string };
-      item: { name: string; nameUr: string | null };
+      batch?: { batchNo: string; name?: string } | null;
+      item?: { name: string; nameUr: string | null } | null;
     }[];
   }): SaleInvoiceDto {
     let totalQtyBase = new Decimal(0);
@@ -88,11 +89,15 @@ export class SalesService {
       return {
         id: line.id,
         saleId: line.saleId,
+        lineType: line.batchId != null ? 'BATCH' : 'RAW',
         batchId: line.batchId,
-        batchNo: line.batch.batchNo,
+        batchNo: line.batch?.batchNo ?? null,
+        batchName: line.batch?.name ?? null,
         itemId: line.itemId,
-        itemName: line.item.name,
-        itemNameUr: line.item.nameUr,
+        itemName:
+          line.batch?.name ||
+          (line.batch ? `Batch ${line.batch.batchNo}` : (line.item?.name ?? 'Raw Item')),
+        itemNameUr: line.item?.nameUr ?? null,
         enteredQty: new Decimal(line.enteredQty.toString()).toFixed(3),
         enteredUnit: line.enteredUnit,
         conversionFactor: new Decimal(line.conversionFactor.toString()).toFixed(3),
@@ -122,6 +127,9 @@ export class SalesService {
 
     const profitMargin = totalDec.gt(0) ? profitDec.div(totalDec).mul(100).toFixed(2) : '0.00';
 
+    const activeChallan =
+      sale.challans?.find((c) => c.status !== 'CANCELLED') ?? sale.challans?.[0];
+
     return {
       id: sale.id,
       invoiceNo: sale.invoiceNo,
@@ -144,6 +152,9 @@ export class SalesService {
       returnedAmount: returnedDec.toFixed(2),
       balanceDue,
       status: sale.status as SaleStatus,
+      challanId: activeChallan?.id ?? null,
+      challanNo: activeChallan?.challanNo ?? null,
+      challanStatus: activeChallan?.status ?? null,
       notes: sale.notes,
       voidReason: sale.voidReason,
       voidedAt: sale.voidedAt ? sale.voidedAt.toISOString() : null,
@@ -203,9 +214,10 @@ export class SalesService {
         include: {
           client: { select: { name: true, nameUr: true } },
           route: { select: { name: true } },
+          challans: { select: { id: true, challanNo: true, status: true, printCount: true } },
           items: {
             include: {
-              batch: { select: { batchNo: true } },
+              batch: { select: { batchNo: true, name: true } },
               item: { select: { name: true, nameUr: true } },
             },
           },
@@ -232,9 +244,10 @@ export class SalesService {
       include: {
         client: { select: { name: true, nameUr: true } },
         route: { select: { name: true } },
+        challans: { select: { id: true, challanNo: true, status: true, printCount: true } },
         items: {
           include: {
-            batch: { select: { batchNo: true } },
+            batch: { select: { batchNo: true, name: true } },
             item: { select: { name: true, nameUr: true } },
           },
         },
@@ -271,8 +284,8 @@ export class SalesService {
       let sumProfit = new Decimal(0);
 
       const calculatedLines: Array<{
-        batchId: number;
-        itemId: number;
+        batchId: number | null;
+        itemId: number | null;
         enteredQty: string;
         enteredUnit: string;
         conversionFactor: string;
@@ -291,35 +304,78 @@ export class SalesService {
       }> = [];
 
       for (const line of input.lines) {
-        const batch = await tx.batch.findFirst({
-          where: { id: line.batchId, organizationId },
-        });
-
-        if (!batch) {
-          throw new BadRequestException(`Batch with ID ${line.batchId} not found`);
-        }
-
-        const item = await tx.item.findFirst({
-          where: { id: line.itemId, organizationId },
-        });
-
-        if (!item) {
-          throw new BadRequestException(`Item with ID ${line.itemId} not found`);
-        }
+        const isBatch = line.lineType === 'BATCH' || (!!line.batchId && line.lineType !== 'RAW');
+        let batchCostRateSnapshot = '0.0000';
+        let resolvedBatchId: number | null = null;
+        let resolvedItemId: number | null = null;
 
         const conv = line.conversionFactor ?? '1.000';
         const qtyBase = convertToBaseUnitQty(line.enteredQty, conv);
 
-        // Lock batch row and verify stock
-        const currentBatchStock = await this.stock.getBatchStock(tx, organizationId, line.batchId);
+        if (isBatch) {
+          if (!line.batchId) {
+            throw new BadRequestException('Batch is required for batch sale lines');
+          }
+          const batch = await tx.batch.findFirst({
+            where: { id: line.batchId, organizationId },
+          });
+          if (!batch) {
+            throw new BadRequestException(`Batch with ID ${line.batchId} not found`);
+          }
 
-        if (new Decimal(currentBatchStock).lt(new Decimal(qtyBase))) {
-          throw new BadRequestException(
-            `Insufficient stock in batch ${batch.batchNo} for ${item.name}. Available: ${currentBatchStock} kg, requested: ${qtyBase} kg.`,
+          resolvedBatchId = batch.id;
+          if (line.itemId) {
+            resolvedItemId = line.itemId;
+          } else if (batch.itemId) {
+            resolvedItemId = batch.itemId;
+          } else {
+            const src = await tx.batchSource.findFirst({ where: { batchId: batch.id } });
+            resolvedItemId = src?.itemId ?? null;
+          }
+
+          // Lock batch row and verify stock
+          const currentBatchStock = await this.stock.getBatchStock(
+            tx,
+            organizationId,
+            line.batchId,
           );
-        }
+          if (new Decimal(currentBatchStock).lt(new Decimal(qtyBase))) {
+            throw new BadRequestException(
+              `Insufficient stock in batch ${batch.batchNo}. Available: ${currentBatchStock} kg, requested: ${qtyBase} kg.`,
+            );
+          }
 
-        const batchCostRateSnapshot = new Decimal(batch.costPerKg.toString()).toFixed(4);
+          batchCostRateSnapshot = new Decimal(batch.costPerKg.toString()).toFixed(4);
+        } else {
+          // RAW item line
+          if (!line.itemId) {
+            throw new BadRequestException('Item is required for raw item sale lines');
+          }
+          const item = await tx.item.findFirst({
+            where: { id: line.itemId, organizationId },
+          });
+          if (!item) {
+            throw new BadRequestException(`Item with ID ${line.itemId} not found`);
+          }
+
+          resolvedBatchId = null;
+          resolvedItemId = item.id;
+
+          // Lock item row and verify unallocated raw stock
+          const currentRawStock = await this.stock.getRawItemStock(tx, organizationId, item.id);
+          if (new Decimal(currentRawStock).lt(new Decimal(qtyBase))) {
+            throw new BadRequestException(
+              `Insufficient raw stock for ${item.name}. Available: ${currentRawStock} kg, requested: ${qtyBase} kg.`,
+            );
+          }
+
+          // Option 3: operator manually enters / confirms cost rate at sale time
+          if (line.costRate && new Decimal(line.costRate).gte(0)) {
+            batchCostRateSnapshot = new Decimal(line.costRate).toFixed(4);
+          } else {
+            batchCostRateSnapshot = '0.0000';
+          }
+        }
 
         const calc = calculateSaleLineAmounts({
           enteredQty: line.enteredQty,
@@ -335,8 +391,8 @@ export class SalesService {
         sumProfit = sumProfit.plus(new Decimal(calc.lineProfit));
 
         calculatedLines.push({
-          batchId: line.batchId,
-          itemId: line.itemId,
+          batchId: resolvedBatchId,
+          itemId: resolvedItemId,
           enteredQty: calc.enteredQty,
           enteredUnit: line.enteredUnit,
           conversionFactor: calc.conversionFactor,
@@ -444,17 +500,20 @@ export class SalesService {
         });
 
         // Record SALE_OUT movement
-        await this.stock.recordMovement(tx, {
-          organizationId,
-          itemId: line.itemId,
-          batchId: line.batchId,
-          type: 'SALE_OUT',
-          qtyBase: new Decimal(line.qtyBase).negated(),
-          refType: 'SALE_INVOICE',
-          refId: created.id,
-          refNo: created.invoiceNo,
-          userId,
-        });
+        if (line.itemId != null) {
+          await this.stock.recordMovement(tx, {
+            organizationId,
+            itemId: line.itemId,
+            batchId: line.batchId,
+            type: 'SALE_OUT',
+            qtyBase: new Decimal(line.qtyBase).negated().toFixed(3),
+            refType: 'SALE_INVOICE',
+            refId: created.id,
+            refNo: created.invoiceNo,
+            note: `Sold on invoice ${created.invoiceNo}`,
+            userId,
+          });
+        }
       }
 
       // Post Client Ledger entry (Debit receivable)
@@ -591,18 +650,20 @@ export class SalesService {
 
       // Reverse stock movements
       for (const item of sale.items) {
-        await this.stock.recordMovement(tx, {
-          organizationId,
-          itemId: item.itemId,
-          batchId: item.batchId,
-          type: 'SALE_CANCEL_IN',
-          qtyBase: new Decimal(item.qtyBase.toString()),
-          refType: 'SALE_CANCEL',
-          refId: sale.id,
-          refNo: sale.invoiceNo,
-          note: `Void invoice ${sale.invoiceNo}: ${reason}`,
-          userId,
-        });
+        if (item.itemId != null) {
+          await this.stock.recordMovement(tx, {
+            organizationId,
+            itemId: item.itemId,
+            batchId: item.batchId,
+            type: 'SALE_CANCEL_IN',
+            qtyBase: new Decimal(item.qtyBase.toString()),
+            refType: 'SALE_CANCEL',
+            refId: sale.id,
+            refNo: sale.invoiceNo,
+            note: `Void invoice ${sale.invoiceNo}: ${reason}`,
+            userId,
+          });
+        }
       }
 
       // Reverse client ledger entry (Credit reversal)

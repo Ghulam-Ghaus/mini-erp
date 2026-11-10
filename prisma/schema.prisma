@@ -725,8 +725,8 @@ model SaleInvoice {
 model SaleItem {
   id                     Int     @id
   saleId                 Int     @map("sale_id")
-  batchId                Int     @map("batch_id")
-  itemId                 Int     @map("item_id")
+  batchId                Int?    @map("batch_id")
+  itemId                 Int?    @map("item_id")
   enteredQty             Decimal @map("entered_qty") @db.Decimal(12, 3)
   enteredUnit            String  @map("entered_unit")
   conversionFactor       Decimal @default(1) @map("conversion_factor") @db.Decimal(12, 3)
@@ -745,8 +745,8 @@ model SaleItem {
   notes                  String?
 
   sale        SaleInvoice      @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  batch       Batch            @relation(fields: [batchId], references: [id])
-  item        Item             @relation(fields: [itemId], references: [id])
+  batch       Batch?           @relation(fields: [batchId], references: [id])
+  item        Item?            @relation(fields: [itemId], references: [id])
   returnItems SaleReturnItem[]
 
   @@index([saleId])
@@ -794,8 +794,8 @@ model SaleReturnItem {
   id                    Int     @id
   saleReturnId          Int     @map("sale_return_id")
   saleItemId            Int     @map("sale_item_id")
-  batchId               Int     @map("batch_id")
-  itemId                Int     @map("item_id")
+  batchId               Int?    @map("batch_id")
+  itemId                Int?    @map("item_id")
   enteredQty            Decimal @map("entered_qty") @db.Decimal(12, 3)
   enteredUnit           String  @map("entered_unit")
   qtyBase               Decimal @map("qty_base") @db.Decimal(12, 3)
@@ -811,8 +811,8 @@ model SaleReturnItem {
 
   saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
   saleItem   SaleItem   @relation(fields: [saleItemId], references: [id])
-  batch      Batch      @relation(fields: [batchId], references: [id])
-  item       Item       @relation(fields: [itemId], references: [id])
+  batch      Batch?     @relation(fields: [batchId], references: [id])
+  item       Item?      @relation(fields: [itemId], references: [id])
 
   @@index([saleReturnId])
   @@index([saleItemId])

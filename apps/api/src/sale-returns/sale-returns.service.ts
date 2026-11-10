@@ -54,8 +54,8 @@ export class SaleReturnsService {
       id: number;
       saleReturnId: number;
       saleItemId: number;
-      batchId: number;
-      itemId: number;
+      batchId: number | null;
+      itemId: number | null;
       enteredQty: Prisma.Decimal;
       enteredUnit: string;
       qtyBase: Prisma.Decimal;
@@ -68,8 +68,8 @@ export class SaleReturnsService {
       batchCostRateSnapshot: Prisma.Decimal;
       cogsReversed: Prisma.Decimal;
       lossAmount: Prisma.Decimal;
-      batch: { batchNo: string };
-      item: { name: string };
+      batch?: { batchNo: string } | null;
+      item?: { name: string } | null;
     }[];
   }): SaleReturnDto {
     const items: SaleReturnItemDto[] = ret.items.map((line) => ({
@@ -77,9 +77,9 @@ export class SaleReturnsService {
       saleReturnId: line.saleReturnId,
       saleItemId: line.saleItemId,
       batchId: line.batchId,
-      batchNo: line.batch.batchNo,
+      batchNo: line.batch?.batchNo ?? null,
       itemId: line.itemId,
-      itemName: line.item.name,
+      itemName: line.item?.name ?? (line.batch ? `Batch ${line.batch.batchNo}` : 'Raw Item'),
       enteredQty: new Decimal(line.enteredQty.toString()).toFixed(3),
       enteredUnit: line.enteredUnit,
       qtyBase: new Decimal(line.qtyBase.toString()).toFixed(3),
@@ -240,8 +240,8 @@ export class SaleReturnsService {
 
       const calculatedItems: Array<{
         saleItemId: number;
-        batchId: number;
-        itemId: number;
+        batchId: number | null;
+        itemId: number | null;
         enteredQty: string;
         enteredUnit: string;
         qtyBase: string;
@@ -374,8 +374,8 @@ export class SaleReturnsService {
           },
         });
 
-        // If resaleable, returned stock goes back to the SAME batch at original snapshot cost
-        if (item.condition === 'RESALEABLE') {
+        // If resaleable, returned stock goes back to the SAME batch or raw stock at original snapshot cost
+        if (item.condition === 'RESALEABLE' && item.itemId != null) {
           await this.stock.recordMovement(tx, {
             organizationId,
             itemId: item.itemId,
@@ -458,7 +458,7 @@ export class SaleReturnsService {
 
       // Reverse stock movements if items were resaleable
       for (const item of ret.items) {
-        if (item.condition === 'RESALEABLE') {
+        if (item.condition === 'RESALEABLE' && item.itemId != null) {
           await this.stock.recordMovement(tx, {
             organizationId,
             itemId: item.itemId,

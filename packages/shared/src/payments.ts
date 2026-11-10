@@ -199,6 +199,7 @@ export interface ChequeDto {
   readonly bounceReason: string | null;
   readonly bounceFee: string;
   readonly notes: string | null;
+  readonly allocations?: readonly PaymentAllocationDto[];
   readonly attachments: readonly AttachmentDto[];
   readonly createdAt: string;
 }

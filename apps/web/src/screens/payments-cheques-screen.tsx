@@ -571,7 +571,6 @@ export function PaymentsChequesScreen({
               {
                 id: 'ledger',
                 label: t('suppliers.actionLedger'),
-                inline: true,
                 onClick: () => onOpenClient360(row.original.partyId),
               },
               {
@@ -646,6 +645,36 @@ export function PaymentsChequesScreen({
         size: 135,
         enableSorting: false,
         cell: ({ row }) => <span className="erp-num text-[#5c5a53]">{row.original.paymentNo}</span>,
+      },
+      {
+        id: 'allocations',
+        header: t('payments.colAllocated', 'Allocated Invoices'),
+        size: 165,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const allocs = row.original.allocations ?? [];
+          return allocs.length === 0 ? (
+            <span className="text-xs text-[#8c8980]">On Account</span>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {allocs.map((al) => (
+                <EntityLink
+                  key={al.id}
+                  mono
+                  onClick={() => {
+                    if (al.invoiceType === 'SALE_INVOICE') {
+                      onViewSaleInvoice(al.invoiceId);
+                    } else if (onViewPurchaseInvoice) {
+                      onViewPurchaseInvoice(al.invoiceId);
+                    }
+                  }}
+                >
+                  {al.invoiceNo || `#${al.invoiceId}`}
+                </EntityLink>
+              ))}
+            </div>
+          );
+        },
       },
       {
         id: 'amount',
@@ -766,7 +795,7 @@ export function PaymentsChequesScreen({
         },
       },
     ],
-    [t, canEdit, onOpenClient360, onOpenSupplier360],
+    [t, canEdit, onOpenClient360, onOpenSupplier360, onViewPurchaseInvoice, onViewSaleInvoice],
   );
 
   return (
@@ -1107,7 +1136,25 @@ export function PaymentsChequesScreen({
           </FormField>
 
           <FormField label={t('payments.amount')} required>
-            <NumberInput precision="money" value={amount} onChange={setAmount} />
+            <NumberInput
+              precision="money"
+              value={amount}
+              onChange={(val) => {
+                setAmount(val);
+                if (openSaleInvoices.length > 0 && Object.keys(allocations).length === 0) {
+                  let remaining = new Decimal(val || '0');
+                  const next: Record<number, string> = {};
+                  for (const inv of openSaleInvoices) {
+                    if (remaining.lte(0)) break;
+                    const due = new Decimal(inv.balanceDue);
+                    const alloc = Decimal.min(remaining, due);
+                    next[inv.id] = alloc.toFixed(2);
+                    remaining = remaining.minus(alloc);
+                  }
+                  setAllocations(next);
+                }
+              }}
+            />
           </FormField>
 
           <FormField label={t('payments.referenceNo')} required={method === 'CHEQUE'}>

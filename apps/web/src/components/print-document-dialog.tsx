@@ -63,19 +63,28 @@ export function PrintDocumentDialog({
   const [trackInfo, setTrackInfo] = useState<PrintTrackResultDto | null>(null);
   const [loadingTrack, setLoadingTrack] = useState(false);
   const printAreaRef = useRef<HTMLDivElement | null>(null);
+  const trackedDocKeyRef = useRef<string | null>(null);
+
+  const docKey = open && doc ? `${doc.type}-${doc.data.id}` : null;
 
   useEffect(() => {
-    if (!open || !doc) {
+    if (!docKey || !doc) {
       setTrackInfo(null);
+      trackedDocKeyRef.current = null;
       return;
     }
+    // Only fetch tracking/preview info once per opened document
+    if (trackedDocKeyRef.current === docKey) {
+      return;
+    }
+    trackedDocKeyRef.current = docKey;
+
     let active = true;
     setLoadingTrack(true);
     trackPrint({ docType: doc.type, docId: doc.data.id })
       .then((res) => {
         if (active) {
           setTrackInfo(res);
-          onPrinted?.();
         }
       })
       .catch(() => {
@@ -87,9 +96,10 @@ export function PrintDocumentDialog({
     return () => {
       active = false;
     };
-  }, [open, doc, onPrinted]);
+  }, [docKey, doc]);
 
   const handleTriggerPrint = () => {
+    onPrinted?.();
     const content = printAreaRef.current?.innerHTML;
     if (!content) return;
     const isRtl = lang === 'UR';
@@ -422,7 +432,8 @@ export function PrintDocumentDialog({
                           {idx + 1}
                         </td>
                         <td className="border border-neutral-300 px-2 py-1 font-medium">
-                          {line.itemName}
+                          {line.batchName ||
+                            (line.batchNo ? `Batch ${line.batchNo}` : line.itemName)}
                           {line.enteredUnit !== 'KG' && (
                             <span className="ml-1 text-[11px] text-neutral-500">
                               ({formatWeight(line.enteredQty)} {line.enteredUnit})
@@ -431,7 +442,7 @@ export function PrintDocumentDialog({
                         </td>
                         {showBatchOnInvoice && !isThermal && (
                           <td className="border border-neutral-300 px-2 py-1 font-mono text-[11px]">
-                            {line.batchNo}
+                            {line.batchNo ?? '—'}
                           </td>
                         )}
                         {!isThermal && (
@@ -596,11 +607,12 @@ export function PrintDocumentDialog({
                           {idx + 1}
                         </td>
                         <td className="border border-neutral-300 px-2 py-1 font-medium">
-                          {item.itemName}
-                          {item.itemNameUr ? ` (${item.itemNameUr})` : ''}
+                          {item.batchName ||
+                            (item.batchNo ? `Batch ${item.batchNo}` : item.itemName)}
+                          {!item.batchNo && item.itemNameUr ? ` (${item.itemNameUr})` : ''}
                         </td>
                         <td className="border border-neutral-300 px-2 py-1 font-mono">
-                          {item.batchNo}
+                          {item.batchNo ?? '—'}
                         </td>
                         <td className="border border-neutral-300 px-2 py-1 text-right font-mono">
                           {item.bagCount ?? '—'}
@@ -665,7 +677,7 @@ export function PrintDocumentDialog({
                     </div>
                     <div>
                       <span className="font-semibold">{label('Date', 'تاریخ')}: </span>
-                      <span className="font-mono">{doc.data.paymentDate}</span>
+                      <span className="font-mono">{doc.data.paymentDate.slice(0, 10)}</span>
                     </div>
                   </div>
                   <div className={isRtl ? 'text-left' : 'text-right'}>
@@ -693,6 +705,27 @@ export function PrintDocumentDialog({
                       PKR {formatMoney(doc.data.amount)}
                     </span>
                   </div>
+
+                  <div className="mt-2 border-t border-neutral-300 pt-2 text-xs">
+                    <span className="font-semibold">
+                      {label('Against Invoice(s)', 'بل نمبر')}:{' '}
+                    </span>
+                    {doc.data.allocations && doc.data.allocations.length > 0 ? (
+                      <span className="font-mono font-medium">
+                        {doc.data.allocations
+                          .map(
+                            (a) =>
+                              `${a.invoiceNo || `#${a.invoiceId}`} (PKR ${formatMoney(a.amount)})`,
+                          )
+                          .join(', ')}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-neutral-500">
+                        {label('On Account / Advance', 'آن اکاؤنٹ / پیشگی')}
+                      </span>
+                    )}
+                  </div>
+
                   {(doc.data.bankName || doc.data.referenceNo) && (
                     <div className="mt-2 border-t border-neutral-300 pt-2 text-xs text-neutral-700">
                       {doc.data.bankName ? `Bank: ${doc.data.bankName} ` : ''}
@@ -787,10 +820,14 @@ export function PrintDocumentDialog({
                     {doc.data.items.map((item) => (
                       <tr key={item.id}>
                         <td className="border border-neutral-300 px-2 py-1 font-medium">
-                          {item.itemName}
+                          {item.batchNo
+                            ? item.itemName?.startsWith('Batch')
+                              ? item.itemName
+                              : `Batch ${item.batchNo}`
+                            : item.itemName}
                         </td>
                         <td className="border border-neutral-300 px-2 py-1 font-mono">
-                          {item.batchNo}
+                          {item.batchNo ?? '—'}
                         </td>
                         <td className="border border-neutral-300 px-2 py-1">{item.condition}</td>
                         <td className="border border-neutral-300 px-2 py-1 text-right font-mono">

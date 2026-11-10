@@ -108,10 +108,10 @@ export interface SaleReturnItemDto {
   readonly id: number;
   readonly saleReturnId: number;
   readonly saleItemId: number;
-  readonly batchId: number;
-  readonly batchNo: string;
-  readonly itemId: number;
-  readonly itemName: string;
+  readonly batchId: number | null;
+  readonly batchNo: string | null;
+  readonly itemId: number | null;
+  readonly itemName: string | null;
   readonly enteredQty: string;
   readonly enteredUnit: string;
   readonly qtyBase: string;

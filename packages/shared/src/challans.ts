@@ -50,11 +50,12 @@ export type TrackPrintInput = z.infer<typeof trackPrintSchema>;
 
 export interface ChallanItemDto {
   id: number;
-  itemId: number;
-  itemName: string;
+  itemId: number | null;
+  itemName: string | null;
   itemNameUr: string | null;
-  batchId: number;
-  batchNo: string;
+  batchId: number | null;
+  batchNo: string | null;
+  batchName?: string | null;
   enteredQty: string;
   enteredUnit: string;
   bagCount: number | null;

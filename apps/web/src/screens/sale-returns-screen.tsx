@@ -51,8 +51,8 @@ import {
 
 interface DraftReturnLine {
   readonly saleItemId: number;
-  readonly batchNo: string;
-  readonly itemName: string;
+  readonly batchNo: string | null;
+  readonly itemName: string | null;
   readonly enteredUnit: string;
   readonly conversionFactor: string;
   readonly soldQtyBase: string;
@@ -242,6 +242,14 @@ export function SaleReturnsScreen({
       subtotalDec.plus(taxTotalDec).minus(deductionDec),
     );
 
+    const hasExceedingQty = lines.some((l) => {
+      const returnBase = new Decimal(l.returnEnteredQty || 0).mul(
+        new Decimal(l.conversionFactor || 1),
+      );
+      const maxAvail = new Decimal(l.availableToReturnQtyBase || 0);
+      return returnBase.gt(maxAvail);
+    });
+
     return {
       lineCalcs,
       subtotal: subtotalDec.toFixed(2),
@@ -249,6 +257,7 @@ export function SaleReturnsScreen({
       cogsReversed: cogsReversedDec.toFixed(2),
       lossAmount: lossTotalDec.toFixed(2),
       totalCredit: totalCreditDec.toFixed(2),
+      hasExceedingQty,
     };
   }, [lines, deduction]);
 
@@ -575,7 +584,7 @@ export function SaleReturnsScreen({
             saveAndNew: 'Post & New',
             cancel: 'Cancel',
           }}
-          isSubmitting={createReturnMutation.isPending}
+          isSubmitting={createReturnMutation.isPending || computedReturn.hasExceedingQty}
           footerSlot={
             <div className="space-y-4">
               {selectedSaleId > 0 && (
@@ -601,7 +610,9 @@ export function SaleReturnsScreen({
                         const maxAvail = new Decimal(line.availableToReturnQtyBase || 0);
                         return (
                           <tr key={line.saleItemId} className="h-10 border-b border-[#e4e2da]">
-                            <td className="px-2.5 font-mono text-[#5c5a53]">{line.batchNo}</td>
+                            <td className="px-2.5 font-mono text-[#5c5a53]">
+                              {line.batchNo ?? 'RAW'}
+                            </td>
                             <td className="px-2.5 font-medium">{line.itemName}</td>
                             <td className="px-2.5 text-right">
                               <WeightText value={line.soldQtyBase} />
@@ -613,18 +624,64 @@ export function SaleReturnsScreen({
                               <WeightText value={line.availableToReturnQtyBase} />
                             </td>
                             <td className="px-2.5">
-                              <NumberInput
-                                precision="weight"
-                                disabled={maxAvail.lte(0)}
-                                value={line.returnEnteredQty}
-                                onChange={(val) =>
-                                  setLines((prev) =>
-                                    prev.map((r, i) =>
-                                      i === idx ? { ...r, returnEnteredQty: val } : r,
-                                    ),
-                                  )
-                                }
-                              />
+                              {(() => {
+                                const convFactor = new Decimal(line.conversionFactor || 1);
+                                const maxAllowedEntered = maxAvail.div(convFactor);
+                                const currentEntered = new Decimal(line.returnEnteredQty || 0);
+                                const isExceeding = currentEntered.gt(maxAllowedEntered);
+                                return (
+                                  <div className="flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-1">
+                                      <NumberInput
+                                        precision="weight"
+                                        disabled={maxAvail.lte(0)}
+                                        hasError={isExceeding}
+                                        value={line.returnEnteredQty}
+                                        onChange={(val) => {
+                                          const enteredDec = new Decimal(val || 0);
+                                          // Auto-clamp so typed or stepped value cannot exceed max returnable
+                                          const finalVal = enteredDec.gt(maxAllowedEntered)
+                                            ? maxAllowedEntered.toFixed(3)
+                                            : val;
+                                          setLines((prev) =>
+                                            prev.map((r, i) =>
+                                              i === idx ? { ...r, returnEnteredQty: finalVal } : r,
+                                            ),
+                                          );
+                                        }}
+                                      />
+                                      {maxAvail.gt(0) && (
+                                        <button
+                                          type="button"
+                                          className="shrink-0 rounded border border-[#d6d3c9] bg-[#f7f6f2] px-1.5 py-1 text-[10px] font-medium text-[#2c6b48] hover:bg-[#eceae4] cursor-pointer"
+                                          onClick={() => {
+                                            setLines((prev) =>
+                                              prev.map((r, i) =>
+                                                i === idx
+                                                  ? {
+                                                      ...r,
+                                                      returnEnteredQty:
+                                                        maxAllowedEntered.toFixed(3),
+                                                    }
+                                                  : r,
+                                              ),
+                                            );
+                                          }}
+                                          title="Fill max returnable quantity"
+                                        >
+                                          All
+                                        </button>
+                                      )}
+                                    </div>
+                                    {isExceeding && (
+                                      <span className="text-[10px] font-semibold text-[#9e3b33]">
+                                        Max returnable is {maxAllowedEntered.toFixed(3)}{' '}
+                                        {line.enteredUnit}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="px-2.5">
                               <Select
@@ -775,7 +832,7 @@ export function SaleReturnsScreen({
                 <tbody>
                   {detailReturn.items.map((it) => (
                     <tr key={it.id} className="h-9 border-b border-[#e4e2da]">
-                      <td className="px-2.5 font-mono">{it.batchNo}</td>
+                      <td className="px-2.5 font-mono">{it.batchNo ?? 'RAW'}</td>
                       <td className="px-2.5 font-medium">{it.itemName}</td>
                       <td className="px-2.5 text-right">
                         <WeightText value={it.qtyBase} />

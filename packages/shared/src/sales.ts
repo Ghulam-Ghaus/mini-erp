@@ -7,17 +7,33 @@ import { PAYMENT_METHODS } from './payments.js';
 export const SALE_STATUSES = ['POSTED', 'PAID', 'PARTIAL', 'VOIDED'] as const;
 export type SaleStatus = (typeof SALE_STATUSES)[number];
 
-export const createSaleLineSchema = z.object({
-  batchId: z.number().int().positive('Batch is required'),
-  itemId: z.number().int().positive('Item is required'),
-  enteredQty: positiveDecimalStringSchema,
-  enteredUnit: z.string().trim().min(1, 'Unit is required').max(30),
-  conversionFactor: positiveDecimalStringSchema.default('1.000'),
-  bagCount: z.number().int().nonnegative().optional().nullable(),
-  ratePerEnteredUnit: nonNegativeDecimalStringSchema,
-  taxRate: nonNegativeDecimalStringSchema.default('0.00'),
-  notes: z.string().trim().max(300).optional(),
-});
+export const createSaleLineSchema = z
+  .object({
+    lineType: z.enum(['BATCH', 'RAW']).optional(),
+    batchId: z.number().int().positive('Batch is required').optional().nullable(),
+    itemId: z.number().int().positive('Item is required').optional().nullable(),
+    costRate: nonNegativeDecimalStringSchema.optional().nullable(),
+    enteredQty: positiveDecimalStringSchema,
+    enteredUnit: z.string().trim().min(1, 'Unit is required').max(30),
+    conversionFactor: positiveDecimalStringSchema.default('1.000'),
+    bagCount: z.number().int().nonnegative().optional().nullable(),
+    ratePerEnteredUnit: nonNegativeDecimalStringSchema,
+    taxRate: nonNegativeDecimalStringSchema.default('0.00'),
+    notes: z.string().trim().max(300).optional(),
+  })
+  .refine(
+    (data) => {
+      const type = data.lineType ?? (data.batchId ? 'BATCH' : 'RAW');
+      if (type === 'BATCH') {
+        return !!data.batchId;
+      }
+      return !!data.itemId;
+    },
+    {
+      message: 'Batch is required for BATCH line; Item is required for RAW line',
+      path: ['batchId'],
+    },
+  );
 
 export type CreateSaleLineInput = z.infer<typeof createSaleLineSchema>;
 
@@ -120,10 +136,12 @@ export function calculateSaleLineAmounts(params: {
 export interface SaleItemDto {
   readonly id: number;
   readonly saleId: number;
-  readonly batchId: number;
-  readonly batchNo: string;
-  readonly itemId: number;
-  readonly itemName: string;
+  readonly lineType?: 'BATCH' | 'RAW';
+  readonly batchId: number | null;
+  readonly batchNo: string | null;
+  readonly batchName?: string | null;
+  readonly itemId: number | null;
+  readonly itemName: string | null;
   readonly itemNameUr?: string | null;
   readonly enteredQty: string;
   readonly enteredUnit: string;
@@ -166,6 +184,9 @@ export interface SaleInvoiceDto {
   readonly returnedAmount: string;
   readonly balanceDue: string;
   readonly status: SaleStatus;
+  readonly challanId?: number | null;
+  readonly challanNo?: string | null;
+  readonly challanStatus?: string | null;
   readonly notes: string | null;
   readonly voidReason: string | null;
   readonly voidedAt: string | null;

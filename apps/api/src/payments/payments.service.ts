@@ -219,6 +219,37 @@ export class PaymentsService {
       createdAt: a.createdAt.toISOString(),
     }));
 
+    const allocationRows = await tx.paymentAllocation.findMany({
+      where: { paymentId: cheque.paymentId },
+      orderBy: { id: 'asc' },
+    });
+
+    const allocations: PaymentAllocationDto[] = await Promise.all(
+      allocationRows.map(async (al) => {
+        let invoiceNo: string | undefined;
+        if (al.invoiceType === 'PURCHASE_INVOICE') {
+          const inv = await tx.purchaseInvoice.findFirst({
+            where: { id: al.invoiceId, organizationId },
+            select: { invoiceNo: true },
+          });
+          invoiceNo = inv?.invoiceNo;
+        } else if (al.invoiceType === 'SALE_INVOICE') {
+          const inv = await tx.saleInvoice.findFirst({
+            where: { id: al.invoiceId, organizationId },
+            select: { invoiceNo: true },
+          });
+          invoiceNo = inv?.invoiceNo;
+        }
+        return {
+          id: al.id,
+          invoiceType: al.invoiceType,
+          invoiceId: al.invoiceId,
+          ...(invoiceNo ? { invoiceNo } : {}),
+          amount: new Decimal(al.amount.toString()).toFixed(2),
+        };
+      }),
+    );
+
     return {
       id: cheque.id,
       paymentId: cheque.paymentId,
@@ -240,6 +271,7 @@ export class PaymentsService {
       bounceReason: cheque.bounceReason,
       bounceFee: new Decimal(cheque.bounceFee.toString()).toFixed(2),
       notes: cheque.notes,
+      allocations,
       attachments,
       createdAt: cheque.createdAt.toISOString(),
     };

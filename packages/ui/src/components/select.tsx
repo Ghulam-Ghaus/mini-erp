@@ -55,6 +55,8 @@ export interface ComboboxProps {
   readonly placeholder?: string;
   readonly searchPlaceholder?: string;
   readonly emptyText?: string;
+  readonly minSearchLength?: number;
+  readonly minSearchPrompt?: string;
   readonly hasError?: boolean;
   readonly disabled?: boolean;
   readonly allowClear?: boolean;
@@ -74,6 +76,8 @@ export function Combobox({
   placeholder = 'Select…',
   searchPlaceholder = 'Type to search…',
   emptyText = 'No matching items found',
+  minSearchLength,
+  minSearchPrompt,
   hasError = false,
   disabled = false,
   allowClear = false,
@@ -93,15 +97,21 @@ export function Combobox({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const isUnderMinSearch = Boolean(
+    typeof minSearchLength === 'number' && query.trim().length < minSearchLength,
+  );
+
   const selected = options.find((opt) => opt.value === value && opt.value !== '');
-  const filtered = options.filter((opt) => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      opt.label.toLowerCase().includes(q) ||
-      Boolean(opt.subtitle && opt.subtitle.toLowerCase().includes(q))
-    );
-  });
+  const filtered = isUnderMinSearch
+    ? []
+    : options.filter((opt) => {
+        const q = query.trim().toLowerCase();
+        if (!q) return true;
+        return (
+          opt.label.toLowerCase().includes(q) ||
+          Boolean(opt.subtitle && opt.subtitle.toLowerCase().includes(q))
+        );
+      });
 
   const updatePosition = () => {
     if (!triggerRef.current) return;
@@ -248,7 +258,11 @@ export function Combobox({
               />
             </div>
             <ul className="max-h-56 overflow-auto py-1 text-xs">
-              {filtered.length === 0 ? (
+              {isUnderMinSearch ? (
+                <li className="px-2.5 py-2 text-[#8c8980]">
+                  {minSearchPrompt ?? 'Type to search…'}
+                </li>
+              ) : filtered.length === 0 ? (
                 <li className="px-2.5 py-2 text-[#8c8980]">{emptyText}</li>
               ) : (
                 filtered.map((opt, idx) => (

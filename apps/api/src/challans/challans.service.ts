@@ -69,10 +69,13 @@ export class ChallansService {
       items: row.sale.items.map((item) => ({
         id: item.id,
         itemId: item.itemId,
-        itemName: item.item.name,
-        itemNameUr: item.item.nameUr,
+        itemName:
+          item.batch?.name ||
+          (item.batch ? `Batch ${item.batch.batchNo}` : (item.item?.name ?? 'Raw Item')),
+        itemNameUr: item.item?.nameUr ?? null,
         batchId: item.batchId,
-        batchNo: item.batch.batchNo,
+        batchNo: item.batch?.batchNo ?? null,
+        batchName: item.batch?.name ?? null,
         enteredQty: new Decimal(item.enteredQty.toString()).toFixed(3),
         enteredUnit: item.enteredUnit,
         bagCount: item.bagCount,
@@ -178,6 +181,18 @@ export class ChallansService {
       }
       if (sale.status === 'VOIDED') {
         throw new BadRequestException('Cannot create a delivery challan for a voided invoice');
+      }
+
+      // If an active (non-cancelled) challan already exists for this invoice, return it idempotently
+      const existingChallan = await tx.challan.findFirst({
+        where: {
+          organizationId,
+          saleId: sale.id,
+          status: { not: 'CANCELLED' },
+        },
+      });
+      if (existingChallan) {
+        return existingChallan.id;
       }
 
       const challanDate = new Date(`${input.challanDate}T00:00:00.000Z`);

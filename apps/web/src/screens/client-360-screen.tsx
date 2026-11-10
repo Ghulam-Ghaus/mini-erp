@@ -129,7 +129,10 @@ export function Client360Screen({
         id: 'entryDate',
         accessorKey: 'entryDate',
         header: 'Date',
-        size: 110,
+        size: 105,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">{row.original.entryDate.slice(0, 10)}</span>
+        ),
       },
       {
         id: 'refNo',
@@ -146,6 +149,31 @@ export function Client360Screen({
         header: 'Type',
         size: 120,
         cell: ({ row }) => <StatusBadge tone="neutral">{row.original.refType}</StatusBadge>,
+      },
+      {
+        id: 'paymentMethod',
+        header: 'Method',
+        size: 110,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const m = row.original.paymentMethod;
+          if (!m) return <span className="text-xs text-[#8c8980]">—</span>;
+          const tone =
+            m === 'CASH'
+              ? 'success'
+              : m === 'CHEQUE'
+                ? 'info'
+                : m === 'BANK_TRANSFER'
+                  ? 'neutral'
+                  : 'warning';
+          const label =
+            m === 'BANK_TRANSFER'
+              ? 'Bank'
+              : m === 'ONLINE_WALLET'
+                ? 'Online'
+                : m.charAt(0) + m.slice(1).toLowerCase();
+          return <StatusBadge tone={tone}>{label}</StatusBadge>;
+        },
       },
       {
         id: 'narration',

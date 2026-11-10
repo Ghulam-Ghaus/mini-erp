@@ -429,4 +429,184 @@ describe('Phase 5 Sales & Returns Integration Tests', () => {
     const clientDetail = await clientsService.getClientById(org.id, client.id);
     expect(clientDetail.currentBalance).toBe('0.00');
   });
+
+  it('allows mixed invoices with batch sale lines (no item specified) and raw item sale lines (operator cost rate)', async () => {
+    const { org, supplier } = await seedTestEnvironment();
+
+    const itemA = await itemsService.createItem(org.id, 1, {
+      name: 'Item A (Processed)',
+      baseUnit: 'KG',
+      defaultTaxRate: '0.00',
+      isActive: true,
+      alternateUnits: [],
+    });
+    const itemRaw = await itemsService.createItem(org.id, 1, {
+      name: 'Item Raw (Direct Resale)',
+      baseUnit: 'KG',
+      defaultTaxRate: '0.00',
+      isActive: true,
+      alternateUnits: [],
+    });
+
+    // Purchase 200 kg of Item A and 150 kg of Item Raw
+    await purchasesService.createPurchaseInvoice(org.id, 1, {
+      supplierId: supplier.id,
+      invoiceDate: '2026-11-01',
+      discount: '0.00',
+      extraCharges: '0.00',
+      lines: [
+        {
+          itemId: itemA.id,
+          enteredQty: '200.000',
+          enteredUnit: 'KG',
+          conversionFactor: '1.000',
+          qtyBase: '200.000',
+          ratePerEnteredUnit: '100.00',
+          taxRate: '0.00',
+        },
+        {
+          itemId: itemRaw.id,
+          enteredQty: '150.000',
+          enteredUnit: 'KG',
+          conversionFactor: '1.000',
+          qtyBase: '150.000',
+          ratePerEnteredUnit: '50.00',
+          taxRate: '0.00',
+        },
+      ],
+    });
+
+    // Create a batch using 100 kg of Item A
+    const available = await batchesService.listAvailablePurchaseItems(org.id, itemA.id);
+    const batch = await batchesService.createBatch(org.id, 1, {
+      name: 'Batch-Processed-01',
+      batchDate: '2026-11-02',
+      status: 'OPEN',
+      wastageMode: 'PERCENT',
+      wastagePercent: '0.000',
+      wastageKg: '0.000',
+      allocations: [
+        {
+          purchaseItemId: available[0]!.purchaseItemId,
+          kgUsed: '100.000',
+        },
+      ],
+      costs: [
+        {
+          costType: 'LABOUR',
+          costDate: '2026-11-02',
+          description: 'Blending',
+          amount: '1000.00',
+        },
+      ],
+    });
+    // Batch cost = 100 kg * 100 = 10,000 + 1,000 = 11,000 / 100 kg = 110.00 / kg
+    expect(batch.costPerKg).toBe('110.00');
+
+    const bulkClient = await clientsService.createClient(
+      org.id,
+      {
+        name: 'Bulk Buyer',
+        phone: '03119876543',
+        openingBalance: '0.00',
+        creditLimit: '500000.00',
+        isActive: true,
+      },
+      1,
+    );
+
+    // Create a sale invoice with:
+    // Line 1: Batch line (only batchId provided, no item selected)
+    // Line 2: Raw item line (only itemId provided, no batch, costRate = 55.00)
+    const sale = await salesService.createSaleInvoice(
+      org.id,
+      {
+        clientId: bulkClient.id,
+        saleDate: '2026-11-03',
+        discount: '0.00',
+        extraCharges: '0.00',
+        lines: [
+          {
+            lineType: 'BATCH',
+            batchId: batch.id,
+            enteredQty: '40.000',
+            enteredUnit: 'KG',
+            conversionFactor: '1.000',
+            taxRate: '0.00',
+            ratePerEnteredUnit: '150.00',
+          },
+          {
+            lineType: 'RAW',
+            itemId: itemRaw.id,
+            costRate: '55.00',
+            enteredQty: '50.000',
+            enteredUnit: 'KG',
+            conversionFactor: '1.000',
+            taxRate: '0.00',
+            ratePerEnteredUnit: '80.00',
+          },
+        ],
+      },
+      1,
+    );
+
+    expect(sale.items).toHaveLength(2);
+
+    // Line 1 verification
+    const batchLine = sale.items[0]!;
+    expect(batchLine.batchId).toBe(batch.id);
+    expect(batchLine.batchCostRateSnapshot).toBe('110.0000');
+    // Subtotal = 40 * 150 = 6000. COGS = 40 * 110 = 4400. Profit = 1600.
+    expect(batchLine.lineSubtotal).toBe('6000.00');
+    expect(batchLine.lineCogs).toBe('4400.00');
+    expect(batchLine.lineProfit).toBe('1600.00');
+
+    // Line 2 verification
+    const rawLine = sale.items[1]!;
+    expect(rawLine.batchId).toBeNull();
+    expect(rawLine.itemId).toBe(itemRaw.id);
+    expect(rawLine.batchCostRateSnapshot).toBe('55.0000');
+    // Subtotal = 50 * 80 = 4000. COGS = 50 * 55 = 2750. Profit = 1250.
+    expect(rawLine.lineSubtotal).toBe('4000.00');
+    expect(rawLine.lineCogs).toBe('2750.00');
+    expect(rawLine.lineProfit).toBe('1250.00');
+
+    // Total invoice: 6000 + 4000 = 10,000. COGS = 7150. Total Profit = 2850.
+    expect(sale.total).toBe('10000.00');
+    expect(sale.totalCogs).toBe('7150.00');
+    expect(sale.totalProfit).toBe('2850.00');
+
+    // Verify batch remaining stock: 100 - 40 = 60 kg
+    const batchAfter = await batchesService.getBatchById(org.id, batch.id);
+    expect(batchAfter.availableKg).toBe('60.000');
+
+    // Verify raw stock remaining for Item Raw: 150 - 50 = 100 kg
+    const itemRawAfter = await itemsService.getItemById(org.id, itemRaw.id);
+    expect(itemRawAfter.rawStockQtyBase).toBe('100.000');
+
+    // Return 10 kg from raw line (should go back to raw inventory)
+    const saleRet = await saleReturnsService.createSaleReturn(
+      org.id,
+      {
+        saleId: sale.id,
+        returnDate: '2026-11-04',
+        reasonCode: 'CUSTOMER_CANCELLED',
+        deduction: '0.00',
+        settlementType: 'ADJUST_BALANCE',
+        lines: [
+          {
+            saleItemId: rawLine.id,
+            enteredQty: '10.000',
+            condition: 'RESALEABLE',
+          },
+        ],
+      },
+      1,
+    );
+    expect(saleRet.status).toBe('POSTED');
+
+    // Raw stock restored: 100 + 10 = 110 kg
+    const itemRawAfterReturn = await itemsService.getItemById(org.id, itemRaw.id);
+    expect(itemRawAfterReturn.rawStockQtyBase).toBe('110.000');
+  });
 });

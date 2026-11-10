@@ -22,6 +22,7 @@ export interface LineItemColumn<TRow> {
 
 export interface LineItemGridProps<TRow> {
   readonly title?: string;
+  readonly headerActions?: ReactNode;
   readonly columns: readonly LineItemColumn<TRow>[];
   readonly rows: readonly TRow[];
   readonly getRowKey: (row: TRow, index: number) => string;
@@ -93,6 +94,7 @@ export function computeNextGridCell(
  */
 export function LineItemGrid<TRow>({
   title,
+  headerActions,
   columns,
   rows,
   getRowKey,
@@ -141,17 +143,21 @@ export function LineItemGrid<TRow>({
 
   return (
     <div ref={containerRef} className="flex flex-col gap-2">
-      {title && (
+      {(title || headerActions) && (
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-[#1f1e1b]">{title}</h3>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onAddRow}
-            icon={<Plus className="h-3.5 w-3.5" />}
-          >
-            {addRowLabel}
-          </Button>
+          {title && <h3 className="text-xs font-semibold text-[#1f1e1b]">{title}</h3>}
+          {headerActions ? (
+            <div className="flex items-center gap-2">{headerActions}</div>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onAddRow}
+              icon={<Plus className="h-3.5 w-3.5" />}
+            >
+              {addRowLabel}
+            </Button>
+          )}
         </div>
       )}
 

@@ -137,11 +137,11 @@ export interface DetailedSalesReportRowDto {
   readonly saleDate: string;
   readonly invoiceNo: string;
   readonly challanNo: string | null;
-  readonly batchId: number;
-  readonly batchNo: string;
-  readonly batchName: string;
-  readonly itemId: number;
-  readonly itemName: string;
+  readonly batchId: number | null;
+  readonly batchNo: string | null;
+  readonly batchName: string | null;
+  readonly itemId: number | null;
+  readonly itemName: string | null;
   readonly clientId: number;
   readonly clientName: string;
   readonly routeId: number | null;

@@ -62,6 +62,7 @@ export interface LedgerEntryDto {
   readonly partyId: number;
   readonly entryDate: string;
   readonly refType: string;
+  readonly paymentMethod?: string | null;
   readonly refId: number;
   readonly refNo: string | null;
   readonly debit: string;

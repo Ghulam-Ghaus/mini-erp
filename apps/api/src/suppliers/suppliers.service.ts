@@ -329,6 +329,19 @@ export class SuppliersService {
       }),
     ]);
 
+    const paymentRefIds = rows.filter((r) => r.refType === 'PAYMENT_OUT').map((r) => r.refId);
+    const payments =
+      paymentRefIds.length > 0
+        ? await this.prisma.payment.findMany({
+            where: { id: { in: paymentRefIds }, organizationId },
+            select: { id: true, method: true },
+          })
+        : [];
+    const paymentMethodMap = new Map<number, string>();
+    for (const p of payments) {
+      paymentMethodMap.set(p.id, p.method);
+    }
+
     const totalDebitInRange = rangeAgg._sum.debit
       ? new Decimal(rangeAgg._sum.debit.toString()).toFixed(2)
       : '0.00';
@@ -342,6 +355,7 @@ export class SuppliersService {
       partyId: e.partyId,
       entryDate: e.entryDate.toISOString(),
       refType: e.refType,
+      paymentMethod: e.refType === 'PAYMENT_OUT' ? (paymentMethodMap.get(e.refId) ?? null) : null,
       refId: e.refId,
       refNo: e.refNo,
       debit: new Decimal(e.debit.toString()).toFixed(2),

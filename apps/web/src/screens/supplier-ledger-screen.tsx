@@ -195,6 +195,31 @@ export function SupplierLedgerScreen({
         },
       },
       {
+        id: 'paymentMethod',
+        header: t('payments.method', 'Method'),
+        size: 110,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const m = row.original.paymentMethod;
+          if (!m) return <span className="text-xs text-[#8c8980]">—</span>;
+          const tone =
+            m === 'CASH'
+              ? 'success'
+              : m === 'CHEQUE'
+                ? 'info'
+                : m === 'BANK_TRANSFER'
+                  ? 'neutral'
+                  : 'warning';
+          const label =
+            m === 'BANK_TRANSFER'
+              ? 'Bank'
+              : m === 'ONLINE_WALLET'
+                ? 'Online'
+                : m.charAt(0) + m.slice(1).toLowerCase();
+          return <StatusBadge tone={tone}>{label}</StatusBadge>;
+        },
+      },
+      {
         id: 'narration',
         header: t('suppliers.colNarration'),
         size: 270,

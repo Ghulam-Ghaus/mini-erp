@@ -43,8 +43,10 @@ import { Decimal } from 'decimal.js';
 import { useEffect, useMemo, useState } from 'react';
 import { PrintDocumentDialog, type PrintableDocument } from '../components/print-document-dialog';
 import {
+  createChallan,
   createSale,
   fetchBatches,
+  fetchChallan,
   fetchClients,
   fetchItems,
   fetchRoutes,
@@ -55,6 +57,7 @@ import {
 
 interface DraftSaleLine {
   readonly key: string;
+  readonly lineType: 'BATCH' | 'RAW';
   readonly batchId: number;
   readonly itemId: number;
   readonly enteredUnit: string;
@@ -67,9 +70,27 @@ interface DraftSaleLine {
   readonly notes: string;
 }
 
-function makeEmptySaleLine(defaultTaxRate = '0.00'): DraftSaleLine {
+function makeEmptyBatchSaleLine(defaultTaxRate = '0.00'): DraftSaleLine {
   return {
     key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    lineType: 'BATCH',
+    batchId: 0,
+    itemId: 0,
+    enteredUnit: 'KG',
+    conversionFactor: '1.000',
+    enteredQty: '0.000',
+    bagCount: '0',
+    ratePerEnteredUnit: '0.00',
+    taxRate: defaultTaxRate,
+    batchCostRateSnapshot: '0.0000',
+    notes: '',
+  };
+}
+
+function makeEmptyRawSaleLine(defaultTaxRate = '0.00'): DraftSaleLine {
+  return {
+    key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    lineType: 'RAW',
     batchId: 0,
     itemId: 0,
     enteredUnit: 'KG',
@@ -176,6 +197,10 @@ export function SalesInvoicesScreen({
     [batchesQuery.data?.data],
   );
   const items = useMemo(() => itemsQuery.data?.data ?? [], [itemsQuery.data?.data]);
+  const inStockItems = useMemo(
+    () => items.filter((it) => new Decimal(it.rawStockQtyBase || 0).gt(0)),
+    [items],
+  );
 
   const batchMap = useMemo(() => {
     const m = new Map<number, BatchSummaryDto>();
@@ -201,7 +226,7 @@ export function SalesInvoicesScreen({
     setPaidNowAmount('0.00');
     setPaidNowMethod('CASH');
     setPaidNowRef('');
-    setLines([makeEmptySaleLine(taxEnabled ? defaultTaxRate : '0.00')]);
+    setLines([makeEmptyBatchSaleLine(taxEnabled ? defaultTaxRate : '0.00')]);
     setCreateOpen(true);
   };
 
@@ -313,6 +338,7 @@ export function SalesInvoicesScreen({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['sales'] }),
       queryClient.invalidateQueries({ queryKey: ['batches'] }),
+      queryClient.invalidateQueries({ queryKey: ['items'] }),
       queryClient.invalidateQueries({ queryKey: ['clients'] }),
       queryClient.invalidateQueries({ queryKey: ['client-ledger'] }),
     ]);
@@ -342,18 +368,52 @@ export function SalesInvoicesScreen({
     },
   });
 
+  const [challanDialogOpen, setChallanDialogOpen] = useState(false);
+  const [challanSaleTarget, setChallanSaleTarget] = useState<SaleInvoiceDto | null>(null);
+  const [challanDate, setChallanDate] = useState(todayStr);
+  const [challanRiderName, setChallanRiderName] = useState('');
+  const [challanVehicleNo, setChallanVehicleNo] = useState('');
+  const [challanNotes, setChallanNotes] = useState('');
+
+  const createChallanMutation = useMutation({
+    mutationFn: createChallan,
+    onSuccess: (newChallan) => {
+      showToast({ title: `Delivery Challan ${newChallan.challanNo} created`, tone: 'success' });
+      setChallanDialogOpen(false);
+      setChallanSaleTarget(null);
+      void queryClient.invalidateQueries({ queryKey: ['challans'] });
+      void queryClient.invalidateQueries({ queryKey: ['sales'] });
+      setPrintDoc({ type: 'CHALLAN', data: newChallan });
+    },
+    onError: (err: Error) => {
+      showToast({ title: err.message, tone: 'danger' });
+    },
+  });
+
+  const handleCreateChallan = () => {
+    if (!challanSaleTarget) return;
+    createChallanMutation.mutate({
+      saleId: challanSaleTarget.id,
+      challanDate: challanDate || todayStr,
+      riderName: challanRiderName.trim() || undefined,
+      vehicleNo: challanVehicleNo.trim() || undefined,
+      notes: challanNotes.trim() || undefined,
+    });
+  };
+
   const handleSaveSale = (andNew: boolean) => {
     if (!clientId) {
       showToast({ title: 'Please select a client', tone: 'danger' });
       return;
     }
 
-    const validLines = lines.filter(
-      (l) => l.batchId > 0 && l.itemId > 0 && new Decimal(l.enteredQty || 0).gt(0),
-    );
+    const validLines = lines.filter((l) => {
+      const hasSource = l.lineType === 'BATCH' ? l.batchId > 0 : l.itemId > 0;
+      return hasSource && new Decimal(l.enteredQty || 0).gt(0);
+    });
     if (validLines.length === 0) {
       showToast({
-        title: 'Add at least one sale line with a batch, item, and positive quantity',
+        title: 'Add at least one sale line with a batch or raw item, and positive quantity',
         tone: 'danger',
       });
       return;
@@ -368,8 +428,11 @@ export function SalesInvoicesScreen({
       extraCharges: new Decimal(extraCharges || 0).toFixed(2),
       notes: notes.trim() || undefined,
       lines: validLines.map((l) => ({
-        batchId: l.batchId,
-        itemId: l.itemId,
+        lineType: l.lineType,
+        batchId: l.lineType === 'BATCH' ? l.batchId : null,
+        itemId: l.lineType === 'RAW' ? l.itemId : l.itemId || null,
+        costRate:
+          l.lineType === 'RAW' ? new Decimal(l.batchCostRateSnapshot || 0).toFixed(4) : undefined,
         enteredQty: new Decimal(l.enteredQty).toFixed(3),
         enteredUnit: l.enteredUnit,
         conversionFactor: new Decimal(l.conversionFactor || 1).toFixed(3),
@@ -403,83 +466,137 @@ export function SalesInvoicesScreen({
   const saleLineColumns = useMemo<LineItemColumn<DraftSaleLine>[]>(
     () => [
       {
-        id: 'batch',
-        header: 'Batch (Source Lot)',
-        width: '230px',
-        renderCell: ({ row, rowIndex, inputProps }) => (
-          <Combobox
-            {...inputProps}
-            value={row.batchId ? String(row.batchId) : ''}
-            placeholder="Search batch…"
-            searchPlaceholder="Search batch no or name…"
-            emptyText="No open batches with available stock"
-            onChange={(val) => {
-              const bId = val ? Number(val) : 0;
-              const batch = batchMap.get(bId);
-              const matchedItem = batch?.itemId ? itemMap.get(batch.itemId) : undefined;
-              setLines((prev) =>
-                prev.map((r, idx) =>
-                  idx === rowIndex
-                    ? {
-                        ...r,
-                        batchId: bId,
-                        itemId: batch?.itemId ?? r.itemId,
-                        enteredUnit: matchedItem?.baseUnit ?? r.enteredUnit,
-                        conversionFactor: '1.000',
-                        batchCostRateSnapshot: batch?.costPerKg ?? '0.0000',
-                      }
-                    : r,
-                ),
-              );
-            }}
-            options={openBatches.map((b) => ({
-              value: String(b.id),
-              label: `${b.batchNo} · ${b.name}`,
-              subtitle: `Avail: ${b.availableKg} kg @ Cost ${b.costPerKg}/kg`,
-            }))}
-          />
+        id: 'lineType',
+        header: 'Type',
+        width: '80px',
+        editable: false,
+        renderCell: ({ row }) => (
+          <span
+            className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ${
+              row.lineType === 'BATCH'
+                ? 'bg-[#e3effb] text-[#1b5e94]'
+                : 'bg-[#fef3d6] text-[#8a5b00]'
+            }`}
+          >
+            {row.lineType}
+          </span>
         ),
         footer: <span className="font-semibold">Totals</span>,
       },
       {
-        id: 'item',
-        header: 'Item',
-        width: '185px',
-        renderCell: ({ row, rowIndex, inputProps }) => (
-          <Combobox
-            {...inputProps}
-            value={row.itemId ? String(row.itemId) : ''}
-            placeholder="Search item…"
-            searchPlaceholder="Type item name…"
-            onChange={(val) => {
-              const itId = val ? Number(val) : 0;
-              const matched = itemMap.get(itId);
-              setLines((prev) =>
-                prev.map((r, idx) =>
-                  idx === rowIndex
-                    ? {
-                        ...r,
-                        itemId: itId,
-                        enteredUnit: matched?.baseUnit ?? 'KG',
-                        conversionFactor: '1.000',
-                      }
-                    : r,
-                ),
-              );
-            }}
-            options={items.map((it) => ({
-              value: String(it.id),
-              label: `${it.name}${it.nameUr ? ` (${it.nameUr})` : ''}`,
-              subtitle: `Unit: ${it.baseUnit}`,
-            }))}
-          />
-        ),
+        id: 'source',
+        header: 'Batch / Raw Item',
+        width: '260px',
+        renderCell: ({ row, rowIndex, inputProps }) => {
+          if (row.lineType === 'BATCH') {
+            return (
+              <Combobox
+                {...inputProps}
+                value={row.batchId ? String(row.batchId) : ''}
+                placeholder="Select batch…"
+                searchPlaceholder="Search batch no or name…"
+                emptyText="No open batches with available stock"
+                onChange={(val) => {
+                  const bId = val ? Number(val) : 0;
+                  const batch = batchMap.get(bId);
+                  setLines((prev) =>
+                    prev.map((r, idx) =>
+                      idx === rowIndex
+                        ? {
+                            ...r,
+                            batchId: bId,
+                            itemId: batch?.itemId ?? 0,
+                            enteredUnit: 'KG',
+                            conversionFactor: '1.000',
+                            batchCostRateSnapshot: batch?.costPerKg ?? '0.0000',
+                          }
+                        : r,
+                    ),
+                  );
+                }}
+                options={openBatches.map((b) => ({
+                  value: String(b.id),
+                  label: `${b.batchNo} · ${b.name}`,
+                  subtitle: `Avail: ${b.availableKg} kg @ Cost ${b.costPerKg}/kg`,
+                }))}
+              />
+            );
+          }
+
+          // RAW Item Line
+          return (
+            <Combobox
+              {...inputProps}
+              value={row.itemId ? String(row.itemId) : ''}
+              placeholder="Select raw item…"
+              searchPlaceholder="Type item name to search in-stock items…"
+              minSearchLength={1}
+              minSearchPrompt="Type at least 1 character to search raw items in stock…"
+              emptyText="No in-stock raw items match your search"
+              onChange={(val) => {
+                const itId = val ? Number(val) : 0;
+                const matched = itemMap.get(itId);
+                setLines((prev) =>
+                  prev.map((r, idx) =>
+                    idx === rowIndex
+                      ? {
+                          ...r,
+                          itemId: itId,
+                          batchId: 0,
+                          enteredUnit: matched?.baseUnit ?? 'KG',
+                          conversionFactor: '1.000',
+                          batchCostRateSnapshot: matched?.lastPurchaseRatePerBase ?? '0.0000',
+                        }
+                      : r,
+                  ),
+                );
+              }}
+              options={inStockItems.map((it) => ({
+                value: String(it.id),
+                label: `${it.name}${it.nameUr ? ` (${it.nameUr})` : ''}`,
+                subtitle: `Raw stock: ${it.rawStockQtyBase} ${it.baseUnit} @ Last cost: ${it.lastPurchaseRatePerBase ?? '0.00'}`,
+              }))}
+            />
+          );
+        },
+      },
+      {
+        id: 'inStock',
+        header: 'In Stock',
+        width: '105px',
+        align: 'right',
+        editable: false,
+        renderCell: ({ row }) => {
+          if (row.lineType === 'BATCH') {
+            const batch = batchMap.get(row.batchId);
+            const avail = batch?.availableKg ?? '0.000';
+            return (
+              <div className="flex flex-col items-end">
+                <span className="font-mono text-xs font-semibold text-[#2c6b48]">{avail} KG</span>
+                <span className="text-[10px] text-[#6f6c64]">in batch</span>
+              </div>
+            );
+          }
+          const item = itemMap.get(row.itemId);
+          const avail = item?.rawStockQtyBase ?? '0.000';
+          return (
+            <div className="flex flex-col items-end">
+              <span className="font-mono text-xs font-semibold text-[#2c6b48]">
+                {avail} {item?.baseUnit ?? 'KG'}
+              </span>
+              <span className="text-[10px] text-[#6f6c64]">raw stock</span>
+            </div>
+          );
+        },
       },
       {
         id: 'unit',
         header: 'Unit',
         width: '95px',
         renderCell: ({ row, rowIndex, inputProps }) => {
+          if (row.lineType === 'BATCH') {
+            return <span className="px-2 py-1 font-mono text-xs text-[#6f6c64]">KG</span>;
+          }
           const item = itemMap.get(row.itemId);
           const unitOpts = [
             { value: item?.baseUnit ?? 'KG', label: item?.baseUnit ?? 'KG', factor: '1.000' },
@@ -551,15 +668,32 @@ export function SalesInvoicesScreen({
       },
       {
         id: 'costSnapshot',
-        header: 'Cost/KG',
+        header: 'Cost Rate',
         align: 'right',
-        width: '100px',
-        editable: false,
-        renderCell: ({ row }) => (
-          <span className="font-mono text-xs text-[#6f6c64]">
-            {new Decimal(row.batchCostRateSnapshot || 0).toFixed(2)}
-          </span>
-        ),
+        width: '110px',
+        renderCell: ({ row, rowIndex, inputProps }) => {
+          if (row.lineType === 'BATCH') {
+            return (
+              <span className="font-mono text-xs text-[#6f6c64]">
+                {new Decimal(row.batchCostRateSnapshot || 0).toFixed(2)}
+              </span>
+            );
+          }
+          return (
+            <NumberInput
+              {...inputProps}
+              precision="money"
+              value={row.batchCostRateSnapshot}
+              onChange={(val) =>
+                setLines((prev) =>
+                  prev.map((r, idx) =>
+                    idx === rowIndex ? { ...r, batchCostRateSnapshot: val } : r,
+                  ),
+                )
+              }
+            />
+          );
+        },
       },
       {
         id: 'lineProfit',
@@ -597,7 +731,7 @@ export function SalesInvoicesScreen({
         footer: <MoneyText value={computedSummary.subtotal} />,
       },
     ],
-    [openBatches, items, batchMap, itemMap, computedSummary],
+    [openBatches, inStockItems, batchMap, itemMap, computedSummary],
   );
 
   const columns = useMemo<ColumnDef<SaleInvoiceDto, unknown>[]>(
@@ -606,11 +740,18 @@ export function SalesInvoicesScreen({
         id: 'invoiceNo',
         accessorKey: 'invoiceNo',
         header: 'Invoice No',
-        size: 135,
+        size: 140,
         cell: ({ row }) => (
-          <EntityLink onClick={() => setDetailSaleId(row.original.id)}>
-            <span className="font-mono">{row.original.invoiceNo}</span>
-          </EntityLink>
+          <div className="flex flex-col">
+            <EntityLink onClick={() => setDetailSaleId(row.original.id)}>
+              <span className="font-mono font-medium">{row.original.invoiceNo}</span>
+            </EntityLink>
+            {row.original.challanNo && (
+              <span className="font-mono text-[10px] text-[#2c6b48]">
+                CH: {row.original.challanNo}
+              </span>
+            )}
+          </div>
         ),
       },
       {
@@ -745,9 +886,40 @@ export function SalesInvoicesScreen({
                   ]
                 : []),
               {
+                id: 'challan-action',
+                label: row.original.challanNo
+                  ? `Print Challan (${row.original.challanNo})`
+                  : 'Generate Delivery Challan',
+                disabled: row.original.status === 'VOIDED',
+                onClick: async () => {
+                  if (row.original.challanId) {
+                    try {
+                      const ch = await fetchChallan(row.original.challanId);
+                      setPrintDoc({ type: 'CHALLAN', data: ch });
+                    } catch (err: unknown) {
+                      showToast({
+                        title: err instanceof Error ? err.message : 'Failed to load challan',
+                        tone: 'danger',
+                      });
+                    }
+                  } else {
+                    setChallanSaleTarget(row.original);
+                    setChallanRiderName(
+                      row.original.routeId
+                        ? (routes.find((r) => r.id === row.original.routeId)?.assignedOfficerName ??
+                            '')
+                        : '',
+                    );
+                    setChallanVehicleNo('');
+                    setChallanNotes('');
+                    setChallanDate(todayStr);
+                    setChallanDialogOpen(true);
+                  }
+                },
+              },
+              {
                 id: 'credit-note',
-                label: 'Credit Note',
-                inline: true,
+                label: 'Credit Note (Return)',
                 disabled: row.original.status === 'VOIDED',
                 onClick: () => onCreateCreditNote(row.original.id),
               },
@@ -766,7 +938,16 @@ export function SalesInvoicesScreen({
         ),
       },
     ],
-    [canVoid, canReceivePayment, onReceivePayment, onOpenClient360, onCreateCreditNote],
+    [
+      canVoid,
+      canReceivePayment,
+      onReceivePayment,
+      onOpenClient360,
+      onCreateCreditNote,
+      routes,
+      todayStr,
+      showToast,
+    ],
   );
 
   const selectedClient = useMemo(() => clients.find((c) => c.id === clientId), [clients, clientId]);
@@ -910,20 +1091,50 @@ export function SalesInvoicesScreen({
           footerSlot={
             <div className="space-y-4">
               <LineItemGrid
-                title="Sale Lines (Select Open Batch & Item)"
+                title="Sale Lines"
+                headerActions={
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        setLines((prev) => [
+                          ...prev,
+                          makeEmptyBatchSaleLine(taxEnabled ? defaultTaxRate : '0.00'),
+                        ])
+                      }
+                    >
+                      + Add Sale Line by Batch
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        setLines((prev) => [
+                          ...prev,
+                          makeEmptyRawSaleLine(taxEnabled ? defaultTaxRate : '0.00'),
+                        ])
+                      }
+                    >
+                      + Add Sale Line by Raw Item
+                    </Button>
+                  </div>
+                }
                 rows={lines}
                 columns={saleLineColumns}
                 getRowKey={(r) => r.key}
                 onAddRow={() =>
                   setLines((prev) => [
                     ...prev,
-                    makeEmptySaleLine(taxEnabled ? defaultTaxRate : '0.00'),
+                    makeEmptyBatchSaleLine(taxEnabled ? defaultTaxRate : '0.00'),
                   ])
                 }
                 onRemoveRow={(idx) =>
                   setLines((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev))
                 }
-                addRowLabel="Add Sale Line"
+                addRowLabel="Add Sale Line by Batch"
                 removeRowLabel="Remove"
               />
 
@@ -1103,17 +1314,59 @@ export function SalesInvoicesScreen({
                   {detailSaleQuery.data.status}
                 </StatusBadge>
                 {detailSaleQuery.data.status !== 'VOIDED' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      const sId = detailSaleQuery.data!.id;
-                      setDetailSaleId(null);
-                      onCreateCreditNote(sId);
-                    }}
-                  >
-                    Create Credit Note (Return)
-                  </Button>
+                  <>
+                    {detailSaleQuery.data.challanNo ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={async () => {
+                          try {
+                            const ch = await fetchChallan(detailSaleQuery.data!.challanId!);
+                            setPrintDoc({ type: 'CHALLAN', data: ch });
+                          } catch (err: unknown) {
+                            showToast({
+                              title: err instanceof Error ? err.message : 'Failed to load challan',
+                              tone: 'danger',
+                            });
+                          }
+                        }}
+                      >
+                        Print Challan ({detailSaleQuery.data.challanNo})
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          const target = detailSaleQuery.data!;
+                          setChallanSaleTarget(target);
+                          setChallanRiderName(
+                            target.routeId
+                              ? (routes.find((r) => r.id === target.routeId)?.assignedOfficerName ??
+                                  '')
+                              : '',
+                          );
+                          setChallanVehicleNo('');
+                          setChallanNotes('');
+                          setChallanDate(todayStr);
+                          setChallanDialogOpen(true);
+                        }}
+                      >
+                        Generate Delivery Challan
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        const sId = detailSaleQuery.data!.id;
+                        setDetailSaleId(null);
+                        onCreateCreditNote(sId);
+                      }}
+                    >
+                      Create Credit Note (Return)
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -1123,7 +1376,7 @@ export function SalesInvoicesScreen({
                 <thead className="bg-[#f1efe9] text-[#5c5a53]">
                   <tr className="h-8 border-b border-[#d6d3c9]">
                     <th className="px-2.5 text-left font-semibold">Batch</th>
-                    <th className="px-2.5 text-left font-semibold">Item</th>
+                    <th className="px-2.5 text-left font-semibold">Description</th>
                     <th className="px-2.5 text-right font-semibold">Sold Qty (KG)</th>
                     <th className="px-2.5 text-right font-semibold">Returned (KG)</th>
                     <th className="px-2.5 text-right font-semibold">Sale Rate</th>
@@ -1137,16 +1390,24 @@ export function SalesInvoicesScreen({
                   {detailSaleQuery.data.items.map((item) => (
                     <tr key={item.id} className="h-9 border-b border-[#e4e2da]">
                       <td className="px-2.5">
-                        <EntityLink
-                          onClick={() => {
-                            setDetailSaleId(null);
-                            onOpenBatchWorkspace(item.batchId);
-                          }}
-                        >
-                          <span className="font-mono">{item.batchNo}</span>
-                        </EntityLink>
+                        {item.batchId && item.batchNo ? (
+                          <EntityLink
+                            onClick={() => {
+                              setDetailSaleId(null);
+                              onOpenBatchWorkspace(item.batchId!);
+                            }}
+                          >
+                            <span className="font-mono">{item.batchNo}</span>
+                          </EntityLink>
+                        ) : (
+                          <span className="rounded bg-[#fef3d6] px-1.5 py-0.5 text-[10px] font-semibold text-[#8a5b00]">
+                            RAW ITEM
+                          </span>
+                        )}
                       </td>
-                      <td className="px-2.5 font-medium">{item.itemName}</td>
+                      <td className="px-2.5 font-medium">
+                        {item.batchName || (item.batchNo ? `Batch ${item.batchNo}` : item.itemName)}
+                      </td>
                       <td className="px-2.5 text-right">
                         <WeightText value={item.qtyBase} />
                       </td>
@@ -1258,6 +1519,122 @@ export function SalesInvoicesScreen({
             >
               Confirm Void
             </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Create Delivery Challan Dialog */}
+      <Dialog
+        open={challanDialogOpen}
+        onClose={() => {
+          if (!createChallanMutation.isPending) {
+            setChallanDialogOpen(false);
+            setChallanSaleTarget(null);
+          }
+        }}
+        title={
+          challanSaleTarget?.challanNo
+            ? `Delivery Challan for ${challanSaleTarget?.invoiceNo ?? ''} (Already Generated)`
+            : `Create Delivery Challan for ${challanSaleTarget?.invoiceNo ?? ''}`
+        }
+      >
+        <div className="space-y-3 p-4 text-xs">
+          {challanSaleTarget?.challanNo && (
+            <div className="rounded border border-[#d2b770] bg-[#fbf6e8] p-2.5 text-xs text-[#6e5114]">
+              <strong>Already Generated:</strong> Delivery Challan{' '}
+              <span className="font-mono font-bold text-[#1f1e1b]">
+                {challanSaleTarget.challanNo}
+              </span>{' '}
+              was already created for this invoice. Re-printing will produce a{' '}
+              <strong>DUPLICATE</strong> copy.
+            </div>
+          )}
+
+          <div className="rounded border border-[#d6d3c9] bg-[#f7f6f2] p-2.5">
+            <div className="flex justify-between">
+              <span className="text-[#6f6c64]">Client:</span>
+              <span className="font-semibold text-[#1f1e1b]">{challanSaleTarget?.clientName}</span>
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-[#6f6c64]">Total Weight:</span>
+              <span className="font-mono font-medium">
+                {challanSaleTarget?.totalQtyBase ?? '0.000'} KG
+              </span>
+            </div>
+            <div className="mt-1 flex justify-between">
+              <span className="text-[#6f6c64]">Route:</span>
+              <span>{challanSaleTarget?.routeName ?? 'Unassigned'}</span>
+            </div>
+          </div>
+
+          <FormField label="Challan Date" required>
+            <DatePicker value={challanDate} onChange={(e) => setChallanDate(e.target.value)} />
+          </FormField>
+
+          <div className="grid grid-cols-2 gap-2">
+            <FormField label="Rider / Driver Name">
+              <TextInput
+                placeholder="e.g. Tariq / Driver"
+                value={challanRiderName}
+                onChange={(e) => setChallanRiderName(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Vehicle No">
+              <TextInput
+                placeholder="e.g. LES-1234"
+                value={challanVehicleNo}
+                onChange={(e) => setChallanVehicleNo(e.target.value)}
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Dispatch / Gate Pass Notes">
+            <TextInput
+              placeholder="Delivery instructions, seal number, etc."
+              value={challanNotes}
+              onChange={(e) => setChallanNotes(e.target.value)}
+            />
+          </FormField>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setChallanDialogOpen(false);
+                setChallanSaleTarget(null);
+              }}
+              disabled={createChallanMutation.isPending}
+            >
+              Cancel
+            </Button>
+            {challanSaleTarget?.challanNo ? (
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  try {
+                    const ch = await fetchChallan(challanSaleTarget.challanId!);
+                    setChallanDialogOpen(false);
+                    setChallanSaleTarget(null);
+                    setPrintDoc({ type: 'CHALLAN', data: ch });
+                  } catch (err: unknown) {
+                    showToast({
+                      title: err instanceof Error ? err.message : 'Failed to load challan',
+                      tone: 'danger',
+                    });
+                  }
+                }}
+              >
+                Print Duplicate Challan
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={handleCreateChallan}
+                disabled={createChallanMutation.isPending}
+              >
+                {createChallanMutation.isPending ? 'Generating...' : 'Generate Challan & Print'}
+              </Button>
+            )}
           </div>
         </div>
       </Dialog>

@@ -415,12 +415,26 @@ export class ClientsService {
       }),
     ]);
 
+    const paymentRefIds = rows.filter((r) => r.refType === 'PAYMENT_IN').map((r) => r.refId);
+    const payments =
+      paymentRefIds.length > 0
+        ? await this.prisma.payment.findMany({
+            where: { id: { in: paymentRefIds }, organizationId },
+            select: { id: true, method: true },
+          })
+        : [];
+    const paymentMethodMap = new Map<number, string>();
+    for (const p of payments) {
+      paymentMethodMap.set(p.id, p.method);
+    }
+
     const entries: LedgerEntryDto[] = rows.map((r) => ({
       id: r.id,
       partyType: 'CLIENT',
       partyId: r.partyId,
       entryDate: r.entryDate.toISOString(),
       refType: r.refType,
+      paymentMethod: r.refType === 'PAYMENT_IN' ? (paymentMethodMap.get(r.refId) ?? null) : null,
       refId: r.refId,
       refNo: r.refNo,
       debit: new Decimal(r.debit.toString()).toFixed(2),
