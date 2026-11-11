@@ -168,6 +168,9 @@ describe('Phase 12: Backup, Restore & Audit Log System', () => {
     expect(entryNames).toContain('manifest.json');
     expect(entryNames).toContain('db_dump.sql');
 
+    const sqlDumpEntry = entries.find((e) => e.name === 'db_dump.sql');
+    expect(sqlDumpEntry?.data.toString('utf8')).toContain('INSERT INTO "id_counters"');
+
     // 3. Check summary
     const summary = await backupService.getSummary(orgId);
     expect(summary.totalBackups).toBeGreaterThanOrEqual(1);
@@ -228,5 +231,43 @@ describe('Phase 12: Backup, Restore & Audit Log System', () => {
 
     const remainingBackups = await backupService.listBackups(orgId, { page: 1, pageSize: 25 });
     expect(remainingBackups.total).toBe(2);
+
+    // 8. Verify external .zip upload restore restores records + id_counters safely
+    await itemsService.createItem(orgId, adminId, {
+      name: 'Temporary Item Before External Restore',
+      category: 'RAW_MATERIAL',
+      baseUnit: 'KG',
+      defaultTaxRate: '0.00',
+      isActive: true,
+      alternateUnits: [],
+    });
+
+    const uploadRestoreRes = await backupService.restoreBackupFromUpload(
+      orgId,
+      zipData,
+      'RESTORE',
+      adminId,
+    );
+    expect(uploadRestoreRes.success).toBe(true);
+    expect(uploadRestoreRes.preRestoreBackupId).toBeGreaterThan(0);
+
+    const itemsAfterUploadRestore = await itemsService.listItems(orgId, {
+      page: 1,
+      pageSize: 25,
+      sortOrder: 'desc',
+    });
+    expect(itemsAfterUploadRestore.total).toBe(1);
+    expect(itemsAfterUploadRestore.data[0]?.name).toBe('Backup Test Item A');
+
+    // Ensure creating a new item after restore succeeds without id_counters collision
+    const postRestoreItem = await itemsService.createItem(orgId, adminId, {
+      name: 'Post Restore New Item',
+      category: 'RAW_MATERIAL',
+      baseUnit: 'KG',
+      defaultTaxRate: '0.00',
+      isActive: true,
+      alternateUnits: [],
+    });
+    expect(postRestoreItem.id).toBeGreaterThan(itemsAfterUploadRestore.data[0]!.id);
   });
 });

@@ -6,6 +6,7 @@ export interface TableExportConfig {
 }
 
 export const EXPORT_TABLES: readonly TableExportConfig[] = [
+  { modelName: 'idCounter', tableName: 'id_counters' },
   { modelName: 'permission', tableName: 'permissions' },
   { modelName: 'organization', tableName: 'organizations' },
   { modelName: 'role', tableName: 'roles' },
@@ -127,4 +128,14 @@ export async function generateSqlDump(prisma: PrismaClient): Promise<string> {
 export async function executeSqlRestore(prisma: PrismaClient, sqlScript: string): Promise<void> {
   // Execute the script
   await prisma.$executeRawUnsafe(sqlScript);
+
+  // Preserve backup_logs and audit_logs gapless ID counters so post-restore logs never collide
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO "id_counters" ("table_name", "last_value")
+    VALUES
+      ('backup_logs', COALESCE((SELECT MAX("id") FROM "backup_logs"), 0)),
+      ('audit_logs', COALESCE((SELECT MAX("id") FROM "audit_logs"), 0))
+    ON CONFLICT ("table_name") DO UPDATE
+    SET "last_value" = GREATEST("id_counters"."last_value", EXCLUDED."last_value");
+  `);
 }

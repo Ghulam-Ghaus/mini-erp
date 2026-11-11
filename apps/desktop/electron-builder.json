@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "com.minierp.desktop",
   "productName": "Mini ERP",
+  "afterPack": "./scripts/after-pack.mjs",
   "directories": {
     "output": "release"
   },
@@ -12,8 +13,8 @@
       "to": "web"
     },
     {
-      "from": "../api/dist",
-      "to": "api/dist"
+      "from": "build-resources/api",
+      "to": "api"
     },
     {
       "from": "../../prisma",

@@ -61,7 +61,142 @@ function downloadCsv(filename: string, headers: string[], rows: (string | number
   URL.revokeObjectURL(url);
 }
 
-export function ReportsScreen() {
+function escapeHtml(val: string | number | null | undefined): string {
+  const s = val === null || val === undefined ? '' : String(val);
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function printReportHtml(options: {
+  title: string;
+  orgName: string;
+  subtitle: string;
+  summaryItems: { label: string; value: string }[];
+  headers: string[];
+  alignments: ('left' | 'right' | 'center')[];
+  rows: (string | number | null | undefined)[][];
+  footerRow?: (string | number | null | undefined)[];
+}) {
+  const iframe = window.document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  window.document.body.appendChild(iframe);
+  const doc = iframe.contentWindow?.document;
+  if (!doc) return;
+
+  const summaryHtml =
+    options.summaryItems.length > 0
+      ? `<div class="summary">${options.summaryItems
+          .map(
+            (s) =>
+              `<div class="stat"><div class="stat-label">${escapeHtml(s.label)}</div><div class="stat-val">${escapeHtml(s.value)}</div></div>`,
+          )
+          .join('')}</div>`
+      : '';
+
+  const theadHtml = `<tr>${options.headers
+    .map(
+      (h, idx) =>
+        `<th style="text-align:${options.alignments[idx] ?? 'left'}">${escapeHtml(h)}</th>`,
+    )
+    .join('')}</tr>`;
+
+  const tbodyHtml =
+    options.rows.length === 0
+      ? `<tr><td colspan="${options.headers.length}" style="text-align:center;padding:18px;color:#777;">No records found</td></tr>`
+      : options.rows
+          .map(
+            (row) =>
+              `<tr>${row
+                .map((cell, idx) => {
+                  const align = options.alignments[idx] ?? 'left';
+                  const cls = align === 'right' ? 'num' : '';
+                  return `<td class="${cls}" style="text-align:${align}">${escapeHtml(cell)}</td>`;
+                })
+                .join('')}</tr>`,
+          )
+          .join('');
+
+  const tfootHtml = options.footerRow
+    ? `<tfoot><tr>${options.footerRow
+        .map((cell, idx) => {
+          const align = options.alignments[idx] ?? 'left';
+          const cls = align === 'right' ? 'num' : '';
+          return `<td class="${cls}" style="text-align:${align}">${escapeHtml(cell)}</td>`;
+        })
+        .join('')}</tr></tfoot>`
+    : '';
+
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(options.title)}</title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', Arial, sans-serif; color: #1f1e1b; font-size: 10px; margin: 0; padding: 0; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #2c2b28; padding-bottom: 8px; margin-bottom: 10px; }
+    .org { font-size: 16px; font-weight: 700; margin: 0; }
+    .title { font-size: 13px; font-weight: 600; color: #2c2b28; margin: 2px 0 0; }
+    .meta { text-align: right; font-size: 9.5px; color: #5c5a53; }
+    .summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .stat { border: 1px solid #d6d3c9; background: #faf9f5; border-radius: 4px; padding: 5px 10px; min-width: 110px; }
+    .stat-label { font-size: 8.5px; text-transform: uppercase; color: #6f6c64; }
+    .stat-val { font-size: 11px; font-weight: 700; font-family: monospace; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; table-layout: auto; }
+    thead { display: table-header-group; }
+    th { background: #f1efe9; border: 1px solid #d6d3c9; padding: 5px 6px; font-size: 9px; font-weight: 600; color: #3b3934; white-space: nowrap; }
+    td { border: 1px solid #e4e2da; padding: 4px 6px; font-size: 9px; vertical-align: top; }
+    tbody tr:nth-child(even) { background: #fcfbf8; }
+    tfoot td { background: #f1efe9; border-top: 2px solid #2c2b28; font-weight: 700; }
+    .num { font-family: 'JetBrains Mono', Consolas, monospace; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1 class="org">${escapeHtml(options.orgName)}</h1>
+      <div class="title">${escapeHtml(options.title)}</div>
+    </div>
+    <div class="meta">
+      <div>${escapeHtml(options.subtitle)}</div>
+      <div>Printed: ${escapeHtml(new Date().toLocaleString())}</div>
+    </div>
+  </div>
+  ${summaryHtml}
+  <table>
+    <thead>${theadHtml}</thead>
+    <tbody>${tbodyHtml}</tbody>
+    ${tfootHtml}
+  </table>
+</body>
+</html>`);
+  doc.close();
+
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => {
+      if (window.document.body.contains(iframe)) {
+        window.document.body.removeChild(iframe);
+      }
+    }, 1000);
+  }, 150);
+}
+
+export interface ReportsScreenProps {
+  readonly orgName?: string;
+  readonly currency?: string;
+}
+
+export function ReportsScreen({ orgName = 'Mini ERP', currency = 'PKR' }: ReportsScreenProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ReportTab>('detailed-sales');
 
@@ -145,7 +280,249 @@ export function ReportsScreen() {
   });
 
   const handlePrint = () => {
-    window.print();
+    const rangeLabel =
+      dateFrom || dateTo ? `Period: ${dateFrom || 'Start'} → ${dateTo || 'Today'}` : 'All Dates';
+
+    if (activeTab === 'detailed-sales') {
+      const rows = detailedSalesQuery.data?.rows ?? [];
+      const totalsRow = detailedSalesQuery.data?.totals;
+      printReportHtml({
+        title: t('reports.tabDetailedSales', 'Detailed Sales Report'),
+        orgName,
+        subtitle: rangeLabel,
+        summaryItems: totalsRow
+          ? [
+              { label: 'Lines', value: String(totalsRow.rowCount) },
+              { label: 'Net Qty (kg)', value: `${formatWeight(totalsRow.totalNetQtyKg)} kg` },
+              { label: 'Total Amount', value: `${currency} ${formatMoney(totalsRow.totalAmount)}` },
+              { label: 'Total COGS', value: `${currency} ${formatMoney(totalsRow.totalCogs)}` },
+              { label: 'Total Profit', value: `${currency} ${formatMoney(totalsRow.totalProfit)}` },
+              {
+                label: 'Avg Profit/kg',
+                value: `${currency} ${formatMoney(totalsRow.avgProfitPerKg)}`,
+              },
+            ]
+          : [],
+        headers: [
+          '#',
+          'Date',
+          'Invoice',
+          'Challan',
+          'Batch',
+          'Item',
+          'Client',
+          'Cost/kg',
+          'Sale/kg',
+          'Qty (kg)',
+          'Amount',
+          'COGS',
+          'Profit',
+          'Profit/kg',
+          'Status',
+          'Salesperson',
+        ],
+        alignments: [
+          'right',
+          'left',
+          'left',
+          'left',
+          'left',
+          'left',
+          'left',
+          'right',
+          'right',
+          'right',
+          'right',
+          'right',
+          'right',
+          'right',
+          'center',
+          'left',
+        ],
+        rows: rows.map((r, i) => [
+          i + 1,
+          r.saleDate,
+          r.invoiceNo,
+          r.challanNo ?? '—',
+          r.batchNo ?? 'RAW',
+          r.itemName,
+          r.clientName,
+          formatMoney(r.batchCostPerKg),
+          formatMoney(r.saleRatePerKg),
+          formatWeight(r.netQtyKg),
+          formatMoney(r.amount),
+          formatMoney(r.cogs),
+          formatMoney(r.profit),
+          formatMoney(r.profitPerKg),
+          r.paymentStatus,
+          r.salespersonName,
+        ]),
+        footerRow: totalsRow
+          ? [
+              '',
+              'TOTALS',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              formatWeight(totalsRow.totalNetQtyKg),
+              formatMoney(totalsRow.totalAmount),
+              formatMoney(totalsRow.totalCogs),
+              formatMoney(totalsRow.totalProfit),
+              formatMoney(totalsRow.avgProfitPerKg),
+              '',
+              '',
+            ]
+          : undefined,
+      });
+    } else if (activeTab === 'batch-profitability') {
+      const rows = batchDashboardQuery.data?.batchPerformance ?? [];
+      printReportHtml({
+        title: t('reports.tabBatchProfitability', 'Batch Profitability & Stock'),
+        orgName,
+        subtitle: rangeLabel,
+        summaryItems: [{ label: 'Total Batches', value: String(rows.length) }],
+        headers: [
+          '#',
+          'Batch No',
+          'Batch Name',
+          'Item',
+          'Status',
+          'Output (kg)',
+          'Sold (kg)',
+          'Remaining (kg)',
+          'Cost/kg',
+          'Avg Sale/kg',
+          'Profit/kg',
+          'Total Profit',
+        ],
+        alignments: [
+          'right',
+          'left',
+          'left',
+          'left',
+          'center',
+          'right',
+          'right',
+          'right',
+          'right',
+          'right',
+          'right',
+          'right',
+        ],
+        rows: rows.map((r, i) => [
+          i + 1,
+          r.batchNo,
+          r.batchName,
+          r.itemName ?? '—',
+          r.status,
+          formatWeight(r.outputKg),
+          formatWeight(r.soldKg),
+          formatWeight(r.remainingKg),
+          formatMoney(r.costPerKg),
+          formatMoney(r.avgSaleRatePerKg),
+          formatMoney(r.profitPerKg),
+          formatMoney(r.totalProfit),
+        ]),
+      });
+    } else if (activeTab === 'cash-book') {
+      const cb = otherReportsQuery.data?.cashBook;
+      const entries = cb?.entries ?? [];
+      printReportHtml({
+        title: t('reports.tabCashBook', 'Daily Cash Book & Closing'),
+        orgName,
+        subtitle: rangeLabel,
+        summaryItems: cb
+          ? [
+              { label: 'Total Inflows', value: `${currency} ${formatMoney(cb.totalIn)}` },
+              { label: 'Total Outflows', value: `${currency} ${formatMoney(cb.totalOut)}` },
+              { label: 'Net Cash Flow', value: `${currency} ${formatMoney(cb.netCashFlow)}` },
+            ]
+          : [],
+        headers: [
+          '#',
+          'Date',
+          'Type',
+          'Ref No',
+          'Party / Payee',
+          'Description',
+          'Method',
+          'Cash In',
+          'Cash Out',
+        ],
+        alignments: ['right', 'left', 'left', 'left', 'left', 'left', 'center', 'right', 'right'],
+        rows: entries.map((e, i) => [
+          i + 1,
+          e.date,
+          e.type,
+          e.refNo,
+          e.partyOrPayee,
+          e.description,
+          e.method,
+          Number(e.cashIn) > 0 ? formatMoney(e.cashIn) : '—',
+          Number(e.cashOut) > 0 ? formatMoney(e.cashOut) : '—',
+        ]),
+      });
+    } else {
+      const ag = otherReportsQuery.data?.receivableAging;
+      const rows = ag?.rows ?? [];
+      printReportHtml({
+        title: t('reports.tabReceivableAging', 'Receivable Aging'),
+        orgName,
+        subtitle: rangeLabel,
+        summaryItems: ag
+          ? [
+              {
+                label: 'Total Receivable',
+                value: `${currency} ${formatMoney(ag.totalReceivable)}`,
+              },
+              { label: '0-30 Days', value: `${currency} ${formatMoney(ag.total0To30)}` },
+              { label: '31-60 Days', value: `${currency} ${formatMoney(ag.total31To60)}` },
+              { label: '61-90 Days', value: `${currency} ${formatMoney(ag.total61To90)}` },
+              { label: '90+ Days', value: `${currency} ${formatMoney(ag.total90Plus)}` },
+            ]
+          : [],
+        headers: [
+          '#',
+          'Client',
+          'Route',
+          'Phone',
+          'Credit Limit',
+          'Balance',
+          '0-30',
+          '31-60',
+          '61-90',
+          '90+',
+        ],
+        alignments: [
+          'right',
+          'left',
+          'left',
+          'left',
+          'right',
+          'right',
+          'right',
+          'right',
+          'right',
+          'right',
+        ],
+        rows: rows.map((r, i) => [
+          i + 1,
+          r.clientName,
+          r.routeName ?? '—',
+          r.phone ?? '—',
+          formatMoney(r.creditLimit),
+          formatMoney(r.currentBalance),
+          formatMoney(r.bucket0To30),
+          formatMoney(r.bucket31To60),
+          formatMoney(r.bucket61To90),
+          formatMoney(r.bucket90Plus),
+        ]),
+      });
+    }
   };
 
   useHotkeys([

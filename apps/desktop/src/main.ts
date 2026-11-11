@@ -7,8 +7,10 @@ import {
   type DesktopNotificationPayload,
 } from '@mini-erp/shared';
 import { app, BrowserWindow, dialog, ipcMain, Notification, session, shell } from 'electron';
-import { watch, type FSWatcher } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, watch, writeFileSync, type FSWatcher } from 'node:fs';
 import path from 'node:path';
+import { parseEnv } from 'node:util';
 import { ApiProcess } from './api-process.js';
 import { findFreePort } from './free-port.js';
 import { HealthTimeoutError, waitForHealth } from './health.js';
@@ -62,16 +64,52 @@ ipcMain.handle('app:check-for-updates', () => {
   return { status: 'up-to-date', version: app.getVersion() };
 });
 
+function resolvePackagedEnv(): Record<string, string> {
+  const userDataDir = app.getPath('userData');
+  if (!existsSync(userDataDir)) {
+    mkdirSync(userDataDir, { recursive: true });
+  }
+
+  const backupDir = path.join(userDataDir, 'backups');
+  const uploadsDir = path.join(userDataDir, 'uploads');
+  if (!existsSync(backupDir)) mkdirSync(backupDir, { recursive: true });
+  if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+
+  const configPath = path.join(userDataDir, 'config.env');
+  if (!existsSync(configPath)) {
+    const generatedSecret = randomBytes(32).toString('hex');
+    const defaultDbUrl = 'postgresql://mini_erp:mini_erp_dev@127.0.0.1:5434/mini_erp?schema=public';
+    writeFileSync(
+      configPath,
+      `# Mini ERP Desktop Configuration\nDATABASE_URL=${defaultDbUrl}\nJWT_SECRET=${generatedSecret}\n`,
+      'utf8',
+    );
+  }
+
+  const parsed = parseEnv(readFileSync(configPath, 'utf8'));
+  const result: Record<string, string> = {
+    BACKUP_DIR: backupDir,
+    UPLOADS_DIR: uploadsDir,
+  };
+  for (const [k, v] of Object.entries(parsed)) {
+    if (v !== undefined) result[k] = v;
+  }
+  return result;
+}
+
 async function startApi(): Promise<void> {
   const port = await findFreePort(API_HOST);
   apiBaseUrl = `http://${API_HOST}:${port}`;
   let exitReason: string | undefined;
+
+  const packagedEnv = isDev ? {} : resolvePackagedEnv();
 
   api = new ApiProcess({
     entry: apiEntryPath(),
     cwd: isDev ? repoRoot : app.getPath('userData'),
     env: {
       ...process.env,
+      ...packagedEnv,
       NODE_ENV: isDev ? 'development' : 'production',
       PORT: String(port),
       HOST: API_HOST,
@@ -174,7 +212,7 @@ async function bootstrap(): Promise<void> {
       `The local API did not become healthy.\n\n${detail}` +
         (isDev
           ? '\n\nDevelopment: make sure PostgreSQL is running (pnpm db:up) and migrations are applied (pnpm db:migrate).'
-          : ''),
+          : `\n\nCheck PostgreSQL connection in:\n${path.join(app.getPath('userData'), 'config.env')}`),
     );
     api?.kill();
     app.quit();

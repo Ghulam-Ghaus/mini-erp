@@ -1149,6 +1149,15 @@ export function fetchBackupSummary(): Promise<BackupSummaryDto> {
   return apiRequest<BackupSummaryDto>('/backups/summary');
 }
 
+export function openBackupFolderApi(): Promise<{
+  readonly opened: boolean;
+  readonly path: string;
+}> {
+  return apiRequest<{ readonly opened: boolean; readonly path: string }>('/backups/open-folder', {
+    method: 'POST',
+  });
+}
+
 export function createManualBackup(type: BackupType = 'MANUAL'): Promise<BackupLogDto> {
   return apiRequest<BackupLogDto>('/backups/manual', {
     method: 'POST',
@@ -1205,4 +1214,48 @@ export async function downloadBackupArchive(backupId: number): Promise<void> {
   link.click();
   document.body.removeChild(link);
   setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+}
+
+export async function restoreBackupFromFile(
+  file: File,
+  confirmCode: 'RESTORE',
+): Promise<{
+  readonly success: boolean;
+  readonly restoredBackupId: number;
+  readonly preRestoreBackupId: number;
+}> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    'content-type': 'application/octet-stream',
+  };
+  if (token) {
+    headers['authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(
+    `${getApiBaseUrl()}/backups/restore-file?confirmCode=${encodeURIComponent(confirmCode)}`,
+    {
+      method: 'POST',
+      headers,
+      body: file,
+    },
+  );
+
+  const body = (await res.json().catch(() => null)) as
+    | { success: boolean; restoredBackupId: number; preRestoreBackupId: number }
+    | { message?: string | string[] }
+    | null;
+
+  if (!res.ok) {
+    const errBody = body as { message?: string | string[] } | null;
+    const rawMsg = errBody?.message;
+    const msg = Array.isArray(rawMsg) ? rawMsg.join(', ') : (rawMsg ?? `HTTP ${res.status}`);
+    throw new ApiClientError(msg, res.status);
+  }
+
+  return body as {
+    readonly success: boolean;
+    readonly restoredBackupId: number;
+    readonly preRestoreBackupId: number;
+  };
 }

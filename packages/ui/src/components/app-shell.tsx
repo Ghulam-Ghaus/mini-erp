@@ -1,4 +1,6 @@
 import {
+  ArrowLeft,
+  ArrowRight,
   Bell,
   ChevronDown,
   ChevronRight,
@@ -54,6 +56,10 @@ export interface AppShellProps {
   readonly navItems: readonly NavItem[];
   readonly activeNavId: string;
   readonly onSelectNav: (navId: string) => void;
+  readonly canGoBack?: boolean;
+  readonly canGoForward?: boolean;
+  readonly onBack?: () => void;
+  readonly onForward?: () => void;
   readonly user: AppShellUser;
   readonly onUserMenuAction: (action: UserMenuAction) => void;
   readonly onOpenSearch: () => void;
@@ -75,6 +81,10 @@ export function AppShell({
   navItems,
   activeNavId,
   onSelectNav,
+  canGoBack = false,
+  canGoForward = false,
+  onBack,
+  onForward,
   user,
   onUserMenuAction,
   onOpenSearch,
@@ -105,6 +115,20 @@ export function AppShell({
       key: 'k',
       ctrlOrMeta: true,
       handler: () => onOpenSearch(),
+    },
+    {
+      key: 'ArrowLeft',
+      alt: true,
+      handler: () => {
+        if (canGoBack) onBack?.();
+      },
+    },
+    {
+      key: 'ArrowRight',
+      alt: true,
+      handler: () => {
+        if (canGoForward) onForward?.();
+      },
     },
   ]);
 
@@ -316,6 +340,28 @@ export function AppShell({
         {/* Topbar */}
         <div className="flex h-11 shrink-0 items-center justify-between border-b border-[#e4e2da] bg-white px-5">
           <div className="flex items-center gap-2">
+            {(onBack || onForward) && (
+              <div className="flex items-center gap-0.5 pe-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Back"
+                  title="Back (Alt+Left)"
+                  disabled={!canGoBack}
+                  onClick={onBack}
+                  icon={<ArrowLeft className="h-3.5 w-3.5" />}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Forward"
+                  title="Forward (Alt+Right)"
+                  disabled={!canGoForward}
+                  onClick={onForward}
+                  icon={<ArrowRight className="h-3.5 w-3.5" />}
+                />
+              </div>
+            )}
             <Button
               variant="secondary"
               size="sm"

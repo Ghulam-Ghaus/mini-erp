@@ -7,6 +7,7 @@ import {
   type PaginatedResponse,
 } from '@mini-erp/shared';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -202,6 +203,72 @@ export class BackupService {
     return deletedCount;
   }
 
+  private async executeZipRestore(
+    orgId: number,
+    zipData: Buffer,
+    sourceLabel: string,
+    actorUserId?: number | null,
+    restoredBackupId = 0,
+  ): Promise<{
+    readonly success: boolean;
+    readonly restoredBackupId: number;
+    readonly preRestoreBackupId: number;
+  }> {
+    if (zipData.length < 30 || zipData.readUInt32LE(0) !== 0x04034b50) {
+      throw new BadRequestException('Invalid backup archive: expected a valid .zip file');
+    }
+
+    const entries = extractZipBuffer(zipData);
+    const sqlEntry = entries.find((e) => e.name === 'db_dump.sql');
+    if (!sqlEntry) {
+      throw new BadRequestException('Invalid backup archive: db_dump.sql not found');
+    }
+
+    const sqlText = sqlEntry.data.toString('utf8');
+    if (!sqlText.startsWith('-- MINI ERP DATABASE DUMP')) {
+      throw new BadRequestException('Invalid backup archive: unrecognized SQL dump header');
+    }
+
+    // Step 1: Automatic PRE_RESTORE backup before touching anything!
+    const preRestore = await this.createBackup(orgId, 'PRE_RESTORE', actorUserId);
+
+    // Step 2: Execute SQL restore (including id_counters)
+    await executeSqlRestore(this.prisma, sqlText);
+
+    // Step 3: Restore uploads directory if entries present
+    const uploadsDir = this.getUploadsDirectory();
+    for (const entry of entries) {
+      if (entry.name.startsWith('uploads/') && entry.name.length > 'uploads/'.length) {
+        const relPath = entry.name.slice('uploads/'.length);
+        const targetPath = path.join(uploadsDir, relPath);
+        const targetDir = path.dirname(targetPath);
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+        fs.writeFileSync(targetPath, entry.data);
+      }
+    }
+
+    // Step 4: Log restore action in AuditLog
+    await this.audit.logStandalone({
+      organizationId: orgId,
+      userId: actorUserId ?? null,
+      action: 'RESTORE_DATABASE',
+      entity: 'BACKUP',
+      entityId: restoredBackupId || null,
+      afterJson: {
+        preRestoreBackupId: preRestore.id,
+        source: sourceLabel,
+      },
+    });
+
+    return {
+      success: true,
+      restoredBackupId,
+      preRestoreBackupId: preRestore.id,
+    };
+  }
+
   /**
    * Restores database and files from a specified backup archive.
    * Safety rule: Always creates an automatic PRE_RESTORE backup before restoring.
@@ -232,54 +299,29 @@ export class BackupService {
       throw new NotFoundException(`Backup file at ${backupRecord.path} no longer exists`);
     }
 
-    // Step 1: Automatic PRE_RESTORE backup before touching anything!
-    const preRestore = await this.createBackup(orgId, 'PRE_RESTORE', actorUserId);
-
-    // Step 2: Read archive and extract files
     const zipData = fs.readFileSync(backupRecord.path);
-    const entries = extractZipBuffer(zipData);
+    return this.executeZipRestore(orgId, zipData, backupRecord.path, actorUserId, backupId);
+  }
 
-    const sqlEntry = entries.find((e) => e.name === 'db_dump.sql');
-    if (!sqlEntry) {
-      throw new BadRequestException('Invalid backup archive: db_dump.sql not found');
+  /**
+   * Restores database and files from an uploaded external .zip backup archive (e.g. new PC / USB).
+   * Safety rule: Always creates an automatic PRE_RESTORE backup before restoring.
+   */
+  async restoreBackupFromUpload(
+    orgId: number,
+    zipData: Buffer,
+    confirmCode: string,
+    actorUserId?: number | null,
+  ): Promise<{
+    readonly success: boolean;
+    readonly restoredBackupId: number;
+    readonly preRestoreBackupId: number;
+  }> {
+    if (confirmCode !== 'RESTORE') {
+      throw new BadRequestException("Confirmation code must be 'RESTORE'");
     }
 
-    // Step 3: Execute SQL restore
-    const sqlText = sqlEntry.data.toString('utf8');
-    await executeSqlRestore(this.prisma, sqlText);
-
-    // Step 4: Restore uploads directory if entries present
-    const uploadsDir = this.getUploadsDirectory();
-    for (const entry of entries) {
-      if (entry.name.startsWith('uploads/') && entry.name.length > 'uploads/'.length) {
-        const relPath = entry.name.slice('uploads/'.length);
-        const targetPath = path.join(uploadsDir, relPath);
-        const targetDir = path.dirname(targetPath);
-        if (!fs.existsSync(targetDir)) {
-          fs.mkdirSync(targetDir, { recursive: true });
-        }
-        fs.writeFileSync(targetPath, entry.data);
-      }
-    }
-
-    // Step 5: Log restore action in AuditLog
-    await this.audit.logStandalone({
-      organizationId: orgId,
-      userId: actorUserId ?? null,
-      action: 'RESTORE_DATABASE',
-      entity: 'BACKUP',
-      entityId: backupId,
-      afterJson: {
-        preRestoreBackupId: preRestore.id,
-        restoredBackupPath: backupRecord.path,
-      },
-    });
-
-    return {
-      success: true,
-      restoredBackupId: backupId,
-      preRestoreBackupId: preRestore.id,
-    };
+    return this.executeZipRestore(orgId, zipData, 'uploaded-zip', actorUserId, 0);
   }
 
   async listBackups(
@@ -362,5 +404,24 @@ export class BackupService {
       throw new NotFoundException(`Backup file with id ${backupId} not found`);
     }
     return record.path;
+  }
+
+  openBackupFolder(orgId: number): { readonly opened: boolean; readonly path: string } {
+    const dir = this.getBackupDirectory(orgId);
+    try {
+      if (process.platform === 'win32') {
+        const child = spawn('explorer.exe', [dir], { detached: true, stdio: 'ignore' });
+        child.unref();
+      } else if (process.platform === 'darwin') {
+        const child = spawn('open', [dir], { detached: true, stdio: 'ignore' });
+        child.unref();
+      } else {
+        const child = spawn('xdg-open', [dir], { detached: true, stdio: 'ignore' });
+        child.unref();
+      }
+      return { opened: true, path: dir };
+    } catch {
+      return { opened: false, path: dir };
+    }
   }
 }

@@ -12,6 +12,10 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useBodyParser('json', { limit: '10mb' });
   app.useBodyParser('urlencoded', { limit: '10mb', extended: true });
+  app.useBodyParser('raw', {
+    type: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
+    limit: '250mb',
+  });
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableCors({ origin: env.CORS_ORIGINS });
   app.enableShutdownHooks();

@@ -40,6 +40,15 @@ export class BackupController {
     return this.backupService.getSummary(auth.user.organizationId);
   }
 
+  @Post('open-folder')
+  @RequirePermission('backup', 'view')
+  openFolder(@CurrentUser() auth: RequestUserContext): {
+    readonly opened: boolean;
+    readonly path: string;
+  } {
+    return this.backupService.openBackupFolder(auth.user.organizationId);
+  }
+
   @Post('manual')
   @RequirePermission('backup', 'create')
   async createManual(
@@ -50,6 +59,27 @@ export class BackupController {
     return this.backupService.createBackup(
       auth.user.organizationId,
       dto.type ?? 'MANUAL',
+      auth.user.id,
+    );
+  }
+
+  @Post('restore-file')
+  @RequirePermission('backup', 'edit')
+  async restoreFromFile(
+    @CurrentUser() auth: RequestUserContext,
+    @Query('confirmCode') confirmCode: string | undefined,
+    @Body() body: unknown,
+  ): Promise<{
+    readonly success: boolean;
+    readonly restoredBackupId: number;
+    readonly preRestoreBackupId: number;
+  }> {
+    const dto = parseWithZod(restoreBackupSchema, { confirmCode });
+    const zipBuffer = Buffer.isBuffer(body) ? body : Buffer.alloc(0);
+    return this.backupService.restoreBackupFromUpload(
+      auth.user.organizationId,
+      zipBuffer,
+      dto.confirmCode,
       auth.user.id,
     );
   }

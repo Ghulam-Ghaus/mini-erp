@@ -29,7 +29,9 @@ import {
   downloadBackupArchive,
   fetchBackupLogs,
   fetchBackupSummary,
+  openBackupFolderApi,
   restoreBackup,
+  restoreBackupFromFile,
 } from '../lib/api.js';
 
 function typeTone(type: BackupType): 'info' | 'neutral' | 'warning' {
@@ -78,6 +80,10 @@ export function BackupScreen() {
   const [restoreTarget, setRestoreTarget] = useState<BackupLogDto | null>(null);
   const [confirmInput, setConfirmInput] = useState('');
 
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importConfirmInput, setImportConfirmInput] = useState('');
+
   const summaryQuery = useQuery({
     queryKey: ['backup-summary'],
     queryFn: fetchBackupSummary,
@@ -117,10 +123,33 @@ export function BackupScreen() {
   const restoreMutation = useMutation({
     mutationFn: (id: number) => restoreBackup(id, 'RESTORE'),
     onSuccess: (res) => {
-      void queryClient.invalidateQueries({ queryKey: ['backup-logs'] });
-      void queryClient.invalidateQueries({ queryKey: ['backup-summary'] });
+      void queryClient.invalidateQueries();
       setRestoreTarget(null);
       setConfirmInput('');
+      showToast({
+        title: t(
+          'backup.restoreSuccess',
+          'Database restored successfully. Pre-restore safety backup #{{preId}} created.',
+          { preId: res.preRestoreBackupId },
+        ),
+        tone: 'success',
+      });
+    },
+    onError: (err: Error) => {
+      showToast({
+        title: err.message || t('backup.restoreFailed', 'Restore failed'),
+        tone: 'danger',
+      });
+    },
+  });
+
+  const importRestoreMutation = useMutation({
+    mutationFn: (file: File) => restoreBackupFromFile(file, 'RESTORE'),
+    onSuccess: (res) => {
+      void queryClient.invalidateQueries();
+      setImportOpen(false);
+      setImportFile(null);
+      setImportConfirmInput('');
       showToast({
         title: t(
           'backup.restoreSuccess',
@@ -162,25 +191,28 @@ export function BackupScreen() {
   const handleOpenFolder = useCallback(
     async (folderPath?: string | null) => {
       const target = folderPath || summary?.backupDir;
-      if (!target) {
-        showToast({
-          title: t('backup.folderUnavailable', 'Backup folder path not available yet'),
-          tone: 'warning',
-        });
-        return;
-      }
-      if (window.desktop?.openFolder) {
+      if (window.desktop?.openFolder && target) {
         const ok = await window.desktop.openFolder(target);
-        if (!ok) {
-          showToast({ title: `Could not open folder: ${target}`, tone: 'danger' });
-        }
-        return;
+        if (ok) return;
       }
       try {
-        await navigator.clipboard?.writeText(target);
-        showToast({ title: `Backup folder path copied: ${target}`, tone: 'success' });
+        const res = await openBackupFolderApi();
+        if (res.opened) {
+          showToast({ title: `Opened folder: ${res.path}`, tone: 'success' });
+          return;
+        }
+        await navigator.clipboard?.writeText(res.path);
+        showToast({ title: `Backup folder path copied: ${res.path}`, tone: 'neutral' });
       } catch {
-        showToast({ title: `Backup folder: ${target}`, tone: 'neutral' });
+        if (target) {
+          await navigator.clipboard?.writeText(target).catch(() => undefined);
+          showToast({ title: `Backup folder path: ${target}`, tone: 'neutral' });
+        } else {
+          showToast({
+            title: t('backup.folderUnavailable', 'Backup folder path not available yet'),
+            tone: 'warning',
+          });
+        }
       }
     },
     [summary?.backupDir, showToast, t],
@@ -285,6 +317,16 @@ export function BackupScreen() {
                 {t('backup.openFolder', 'Open Backup Folder')}
               </Button>
             )}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setImportFile(null);
+                setImportConfirmInput('');
+                setImportOpen(true);
+              }}
+            >
+              {t('backup.importRestore', 'Import & Restore .zip')}
+            </Button>
             <Button
               variant="primary"
               onClick={() => createMutation.mutate()}
@@ -477,6 +519,88 @@ export function BackupScreen() {
           </div>
         </Dialog>
       )}
+
+      <Dialog
+        open={importOpen}
+        onClose={() => {
+          if (!importRestoreMutation.isPending) {
+            setImportOpen(false);
+            setImportFile(null);
+            setImportConfirmInput('');
+          }
+        }}
+        title={t('backup.importRestoreTitle', 'Import & Restore Backup (.zip)')}
+        maxWidthClass="max-w-md"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              disabled={importRestoreMutation.isPending}
+              onClick={() => {
+                setImportOpen(false);
+                setImportFile(null);
+                setImportConfirmInput('');
+              }}
+            >
+              {t('common.cancel', 'Cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              disabled={
+                !importFile || importConfirmInput !== 'RESTORE' || importRestoreMutation.isPending
+              }
+              onClick={() => {
+                if (importFile) importRestoreMutation.mutate(importFile);
+              }}
+            >
+              {importRestoreMutation.isPending
+                ? t('backup.restoring', 'Restoring...')
+                : t('backup.confirmImportRestore', 'Import & Restore')}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4 p-4 text-xs">
+          <div className="rounded border border-[#ead0cd] bg-[#fbf2f1] p-3 text-[#9e3b33]">
+            <p className="font-semibold">
+              {t('backup.restoreWarningTitle', 'High Risk Action: Database Snapshot Overwrite')}
+            </p>
+            <p className="mt-1 leading-relaxed">
+              {t(
+                'backup.importWarningBody',
+                'Select a .zip backup archive from USB or another folder. Existing database records and uploads will be replaced with the snapshot inside the file. An automated pre-restore backup will be created first.',
+              )}
+            </p>
+          </div>
+
+          <FormField label={t('backup.selectZipFile', 'Backup Archive (.zip)')} required>
+            <div className="flex flex-col gap-1.5">
+              <input
+                type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                className="block w-full rounded border border-[#d6d3c9] bg-white px-2.5 py-1.5 text-xs text-[#1f1e1b] file:me-3 file:cursor-pointer file:rounded file:border file:border-[#d6d3c9] file:bg-[#f1efe9] file:px-2.5 file:py-1 file:text-xs file:font-medium file:text-[#1f1e1b] hover:file:bg-[#e7e4dc]"
+              />
+              {importFile && (
+                <span className="font-mono text-[11px] text-[#5c5a53]">
+                  {importFile.name} ({formatBytes(importFile.size)})
+                </span>
+              )}
+            </div>
+          </FormField>
+
+          <FormField
+            label={t('backup.typeRestoreToConfirm', 'Type "RESTORE" to confirm:')}
+            required
+          >
+            <TextInput
+              value={importConfirmInput}
+              onChange={(e) => setImportConfirmInput(e.target.value)}
+              placeholder="RESTORE"
+            />
+          </FormField>
+        </div>
+      </Dialog>
     </div>
   );
 }

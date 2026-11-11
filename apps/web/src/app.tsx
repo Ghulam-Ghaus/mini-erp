@@ -72,7 +72,36 @@ function RootApplication() {
 
   const [hasToken, setHasToken] = useState<boolean>(() => Boolean(getStoredToken()));
   const [locked, setLocked] = useState(false);
-  const [activeNavId, setActiveNavId] = useState('dashboard');
+  const [navState, setNavState] = useState<{
+    readonly history: readonly string[];
+    readonly index: number;
+  }>({
+    history: ['dashboard'],
+    index: 0,
+  });
+  const activeNavId = navState.history[navState.index] ?? 'dashboard';
+  const canGoBack = navState.index > 0;
+  const canGoForward = navState.index < navState.history.length - 1;
+
+  const setActiveNavId = useCallback((navId: string) => {
+    setNavState((prev) => {
+      const current = prev.history[prev.index];
+      if (current === navId) return prev;
+      const truncated = prev.history.slice(0, prev.index + 1);
+      const nextHistory = [...truncated, navId].slice(-50);
+      return { history: nextHistory, index: nextHistory.length - 1 };
+    });
+  }, []);
+
+  const handleNavBack = useCallback(() => {
+    setNavState((prev) => (prev.index > 0 ? { ...prev, index: prev.index - 1 } : prev));
+  }, []);
+
+  const handleNavForward = useCallback(() => {
+    setNavState((prev) =>
+      prev.index < prev.history.length - 1 ? { ...prev, index: prev.index + 1 } : prev,
+    );
+  }, []);
   const [commandOpen, setCommandOpen] = useState(false);
   const [changePinOpen, setChangePinOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -100,14 +129,17 @@ function RootApplication() {
     'receipts-in' | 'cheques' | 'payments-out' | null
   >(null);
 
-  const handleAppNavigate = useCallback((navId: string) => {
-    if (navId === 'cheques-register') {
-      setPaymentsTabRequest('cheques');
-      setActiveNavId('payments-cheques');
-      return;
-    }
-    setActiveNavId(navId);
-  }, []);
+  const handleAppNavigate = useCallback(
+    (navId: string) => {
+      if (navId === 'cheques-register') {
+        setPaymentsTabRequest('cheques');
+        setActiveNavId('payments-cheques');
+        return;
+      }
+      setActiveNavId(navId);
+    },
+    [setActiveNavId],
+  );
 
   const health = useQuery({
     queryKey: ['health'],
@@ -215,7 +247,7 @@ function RootApplication() {
       organization: session.organization,
       permissions: session.permissions,
     });
-    setActiveNavId('dashboard');
+    setNavState({ history: ['dashboard'], index: 0 });
   };
 
   const healthTone: StatusTone = health.isError
@@ -373,7 +405,7 @@ function RootApplication() {
         onSelect: () => setActiveNavId(n.id),
       })),
     ],
-    [t, navItems, toggleLanguage],
+    [t, navItems, toggleLanguage, setActiveNavId],
   );
 
   // 1. Loading setup status
@@ -445,6 +477,10 @@ function RootApplication() {
       navItems={navItems}
       activeNavId={activeNavId}
       onSelectNav={setActiveNavId}
+      canGoBack={canGoBack}
+      canGoForward={canGoForward}
+      onBack={handleNavBack}
+      onForward={handleNavForward}
       user={{
         name: `${session.user.firstName} ${session.user.lastName}`,
         role: displayRoleName,
@@ -707,7 +743,7 @@ function RootApplication() {
       ) : activeNavId === 'payroll' && can('payroll', 'view') ? (
         <PayrollScreen />
       ) : activeNavId === 'reports' && can('reports', 'view') ? (
-        <ReportsScreen />
+        <ReportsScreen orgName={displayOrgName} currency={session.organization.currency} />
       ) : activeNavId === 'notifications' && can('notifications', 'view') ? (
         <NotificationsScreen onNavigate={handleAppNavigate} />
       ) : activeNavId === 'audit-logs' && can('audit', 'view') ? (

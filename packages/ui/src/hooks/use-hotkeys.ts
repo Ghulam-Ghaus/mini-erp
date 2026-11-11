@@ -5,6 +5,8 @@ export interface HotkeyBinding {
   readonly key: string;
   /** Require Ctrl (or Cmd on macOS). Default false. */
   readonly ctrlOrMeta?: boolean;
+  /** Require Alt / Option. Default false. */
+  readonly alt?: boolean;
   /** Whether to fire even when focus is inside an input/textarea/select. */
   readonly allowInInput?: boolean;
   readonly handler: (event: KeyboardEvent) => void;
@@ -20,9 +22,9 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 export function matchesHotkey(
   event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey'>,
-  binding: Pick<HotkeyBinding, 'key' | 'ctrlOrMeta'>,
+  binding: Pick<HotkeyBinding, 'key' | 'ctrlOrMeta' | 'alt'>,
 ): boolean {
-  if (event.altKey) return false;
+  if (Boolean(binding.alt) !== Boolean(event.altKey)) return false;
   const hasMod = Boolean(event.ctrlKey || event.metaKey);
   if (Boolean(binding.ctrlOrMeta) !== hasMod) return false;
   return event.key.toLowerCase() === binding.key.toLowerCase();

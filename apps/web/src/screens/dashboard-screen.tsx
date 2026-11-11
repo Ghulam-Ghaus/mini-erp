@@ -11,14 +11,23 @@ import {
   Button,
   DataTable,
   DatePicker,
+  IntegerText,
   MoneyText,
   PageHeader,
   StatCard,
   StatusBadge,
   SurfaceCard,
   type ColumnDef,
+  type DataTableColumnMeta,
 } from '@mini-erp/ui';
 import { fetchDashboardReport } from '../lib/api.js';
+
+function formatCompactMoney(val: number): string {
+  const abs = Math.abs(val);
+  if (abs >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${(val / 1_000).toFixed(abs >= 10_000 ? 0 : 1)}k`;
+  return val.toFixed(0);
+}
 
 export interface DashboardScreenProps {
   readonly orgName: string;
@@ -56,6 +65,13 @@ export function DashboardScreen({ orgName, currency, onNavigate }: DashboardScre
 
   const batchColumns = useMemo<ColumnDef<DashboardBatchPerformanceRowDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 50,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.index + 1} />,
+      },
       {
         accessorKey: 'batchNo',
         header: t('reports.colBatch', 'Batch'),
@@ -185,13 +201,17 @@ export function DashboardScreen({ orgName, currency, onNavigate }: DashboardScre
       />
 
       {preset === 'CUSTOM' && (
-        <div className="flex flex-wrap items-center gap-3 border-b border-[#e4e2da] bg-[#faf9f5] px-5 py-2.5 text-xs">
+        <div className="flex flex-wrap items-center gap-2.5 border-b border-[#e4e2da] bg-[#faf9f5] px-5 py-2.5 text-xs">
           <span className="font-medium text-[#5c5a53]">
             {t('dashboard.customRange', 'Custom Date Range')}:
           </span>
-          <DatePicker value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <div className="w-40">
+            <DatePicker value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </div>
           <span className="text-[#6f6c64]">→</span>
-          <DatePicker value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <div className="w-40">
+            <DatePicker value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
         </div>
       )}
 
@@ -263,43 +283,50 @@ export function DashboardScreen({ orgName, currency, onNavigate }: DashboardScre
             </div>
           </div>
           {dailySeries.length === 0 ? (
-            <div className="py-8 text-center text-xs text-[#8c8980]">
+            <div className="flex h-48 items-center justify-center text-xs text-[#8c8980]">
               {t('dashboard.noChartData', 'No sales or receipts recorded in this period')}
             </div>
           ) : (
-            <div className="space-y-2 max-h-52 overflow-y-auto pe-1">
-              {dailySeries.map((pt) => {
-                const salesPct = Math.min(
-                  100,
-                  Math.max(2, (Math.abs(Number(pt.salesAmount)) / maxDailyVal) * 100),
-                );
-                const recPct = Math.min(
-                  100,
-                  Math.max(2, (Math.abs(Number(pt.receivedAmount)) / maxDailyVal) * 100),
-                );
-                return (
-                  <div key={pt.date} className="text-xs">
-                    <div className="mb-0.5 flex items-center justify-between font-mono text-[11px]">
-                      <span className="text-[#5c5a53]">{pt.date}</span>
-                      <span>
-                        <span className="text-[#1f1e1b]">{formatMoney(pt.salesAmount)}</span>
-                        {' / '}
-                        <span className="text-[#2e6b4e]">{formatMoney(pt.receivedAmount)}</span>
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1">
+            <div className="flex h-48 gap-2 pt-2">
+              <div className="flex h-36 flex-col justify-between pe-1 text-end font-mono text-[10px] text-[#8c8980]">
+                <span>{formatCompactMoney(maxDailyVal)}</span>
+                <span>{formatCompactMoney(maxDailyVal / 2)}</span>
+                <span>0</span>
+              </div>
+              <div className="flex-1 overflow-x-auto pb-1">
+                <div className="relative flex h-36 min-w-full items-end gap-3 border-b border-s border-[#e4e2da] px-3">
+                  <div className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-[#efede7]" />
+                  <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-[#efede7]" />
+                  {dailySeries.map((pt) => {
+                    const salesNum = Math.abs(Number(pt.salesAmount));
+                    const recNum = Math.abs(Number(pt.receivedAmount));
+                    const salesH = salesNum > 0 ? Math.max(4, (salesNum / maxDailyVal) * 100) : 0;
+                    const recH = recNum > 0 ? Math.max(4, (recNum / maxDailyVal) * 100) : 0;
+                    return (
                       <div
-                        className="h-2 rounded-sm bg-[#2c2b28]"
-                        style={{ width: `${salesPct}%` }}
-                      />
-                      <div
-                        className="h-2 rounded-sm bg-[#2e6b4e]"
-                        style={{ width: `${recPct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                        key={pt.date}
+                        title={`${pt.date}\nSales: ${formatMoney(pt.salesAmount)}\nReceived: ${formatMoney(pt.receivedAmount)}`}
+                        className="group relative flex h-full min-w-[44px] flex-1 flex-col items-center justify-end"
+                      >
+                        <div className="flex h-full w-full items-end justify-center gap-1">
+                          <div
+                            className="w-3.5 rounded-t-sm bg-[#2c2b28] transition-opacity group-hover:opacity-80"
+                            style={{ height: `${salesH}%` }}
+                          />
+                          <div
+                            className="w-3.5 rounded-t-sm bg-[#2e6b4e] transition-opacity group-hover:opacity-80"
+                            style={{ height: `${recH}%` }}
+                          />
+                        </div>
+                        <span className="mt-1.5 font-mono text-[10px] text-[#5c5a53] -mb-6 whitespace-nowrap">
+                          {pt.date.slice(5)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="h-6" />
+              </div>
             </div>
           )}
         </SurfaceCard>
@@ -329,65 +356,75 @@ export function DashboardScreen({ orgName, currency, onNavigate }: DashboardScre
             </div>
           </div>
           {batchProfitSeries.length === 0 ? (
-            <div className="py-8 text-center text-xs text-[#8c8980]">
+            <div className="flex h-48 items-center justify-center text-xs text-[#8c8980]">
               {t('dashboard.noBatchProfitData', 'No batch sales recorded yet')}
             </div>
           ) : (
-            <div className="space-y-2 max-h-52 overflow-y-auto pe-1">
-              {batchProfitSeries.map((pt) => {
-                const revPct = Math.min(
-                  100,
-                  Math.max(2, (Math.abs(Number(pt.revenue)) / maxBatchProfitVal) * 100),
-                );
-                const profPct = Math.min(
-                  100,
-                  Math.max(2, (Math.abs(Number(pt.grossProfit)) / maxBatchProfitVal) * 100),
-                );
-                return (
-                  <div key={pt.batchId} className="text-xs">
-                    <div className="mb-0.5 flex items-center justify-between text-[11px]">
-                      <span className="font-mono font-medium text-[#1f1e1b]">
-                        {pt.batchNo}{' '}
-                        <span className="font-sans font-normal text-[#6f6c64]">
-                          ({pt.batchName})
+            <div className="flex h-48 gap-2 pt-2">
+              <div className="flex h-36 flex-col justify-between pe-1 text-end font-mono text-[10px] text-[#8c8980]">
+                <span>{formatCompactMoney(maxBatchProfitVal)}</span>
+                <span>{formatCompactMoney(maxBatchProfitVal / 2)}</span>
+                <span>0</span>
+              </div>
+              <div className="flex-1 overflow-x-auto pb-1">
+                <div className="relative flex h-36 min-w-full items-end gap-3 border-b border-s border-[#e4e2da] px-3">
+                  <div className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-[#efede7]" />
+                  <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-[#efede7]" />
+                  {batchProfitSeries.map((pt) => {
+                    const revNum = Math.abs(Number(pt.revenue));
+                    const profNum = Math.abs(Number(pt.grossProfit));
+                    const revH = revNum > 0 ? Math.max(4, (revNum / maxBatchProfitVal) * 100) : 0;
+                    const profH =
+                      profNum > 0 ? Math.max(4, (profNum / maxBatchProfitVal) * 100) : 0;
+                    return (
+                      <div
+                        key={pt.batchId}
+                        title={`${pt.batchNo} (${pt.batchName})\nRevenue: ${formatMoney(pt.revenue)}\nGross Profit: ${formatMoney(pt.grossProfit)}`}
+                        className="group relative flex h-full min-w-[56px] flex-1 flex-col items-center justify-end"
+                      >
+                        <div className="flex h-full w-full items-end justify-center gap-1">
+                          <div
+                            className="w-4 rounded-t-sm bg-[#a39e93] transition-opacity group-hover:opacity-80"
+                            style={{ height: `${revH}%` }}
+                          />
+                          <div
+                            className="w-4 rounded-t-sm bg-[#2e6b4e] transition-opacity group-hover:opacity-80"
+                            style={{ height: `${profH}%` }}
+                          />
+                        </div>
+                        <span className="mt-1.5 max-w-[72px] truncate font-mono text-[10px] text-[#5c5a53] -mb-6">
+                          {pt.batchNo.replace(/^BAT-\d{4}-/, '#')}
                         </span>
-                      </span>
-                      <span className="font-mono font-semibold text-[#2e6b4e]">
-                        {formatMoney(pt.grossProfit)}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div
-                        className="h-2 rounded-sm bg-[#a39e93]"
-                        style={{ width: `${revPct}%` }}
-                      />
-                      <div
-                        className="h-2 rounded-sm bg-[#2e6b4e]"
-                        style={{ width: `${profPct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="h-6" />
+              </div>
             </div>
           )}
         </SurfaceCard>
       </div>
 
-      {/* Batch Performance Table (Section 5.3) */}
+      {/* Batch Performance Table (Section 5.3 - Top 5 on Dashboard) */}
       <div className="px-5 pb-4">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5c5a53]">
-            {t('dashboard.batchPerformanceTitle', 'Batch Performance')}
+            {t('dashboard.batchPerformanceTop5', 'Batch Performance (Top 5)')}
           </h3>
-          <Button size="sm" variant="ghost" onClick={() => onNavigate('batches')}>
-            {t('dashboard.viewAllBatches', 'View Batches')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" onClick={() => onNavigate('reports')}>
+              {t('dashboard.fullBatchReport', 'All in Reports')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onNavigate('batches')}>
+              {t('dashboard.viewAllBatches', 'View Batches')}
+            </Button>
+          </div>
         </div>
         <div className="rounded border border-[#e4e2da] bg-white">
           <DataTable
             columns={batchColumns}
-            data={data?.batchPerformance ?? []}
+            data={(data?.batchPerformance ?? []).slice(0, 5)}
             isLoading={dashboardQuery.isLoading}
             emptyTitle={t('dashboard.noBatchesTitle', 'No batches created yet')}
             emptyDescription={t(

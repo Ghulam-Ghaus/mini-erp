@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json && wait-on -t 180000 tcp:127.0.0.1:5173 && electron .",
+    "package:win": "tsc -p tsconfig.build.json && node scripts/prepare-build.mjs && electron-builder --win",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -18,6 +19,7 @@
     "@mini-erp/config": "workspace:*",
     "@types/node": "^22.0.0",
     "electron": "^35.0.0",
+    "electron-builder": "^26.18.0",
     "eslint": "^9.20.0",
     "typescript": "6.0.3",
     "vitest": "^3.0.0",
