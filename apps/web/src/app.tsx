@@ -96,6 +96,18 @@ function RootApplication() {
     clientId: number;
     saleId?: number;
   } | null>(null);
+  const [paymentsTabRequest, setPaymentsTabRequest] = useState<
+    'receipts-in' | 'cheques' | 'payments-out' | null
+  >(null);
+
+  const handleAppNavigate = useCallback((navId: string) => {
+    if (navId === 'cheques-register') {
+      setPaymentsTabRequest('cheques');
+      setActiveNavId('payments-cheques');
+      return;
+    }
+    setActiveNavId(navId);
+  }, []);
 
   const health = useQuery({
     queryKey: ['health'],
@@ -579,6 +591,8 @@ function RootApplication() {
           canCreate={can('payments', 'create')}
           canEdit={can('payments', 'edit')}
           canVoid={can('payments', 'delete')}
+          requestedTab={paymentsTabRequest}
+          onClearRequestedTab={() => setPaymentsTabRequest(null)}
           prefillClientId={prefillReceiptContext?.clientId ?? null}
           prefillSaleId={prefillReceiptContext?.saleId ?? null}
           prefillSupplierId={prefillPaymentContext?.supplierId ?? null}
@@ -695,7 +709,7 @@ function RootApplication() {
       ) : activeNavId === 'reports' && can('reports', 'view') ? (
         <ReportsScreen />
       ) : activeNavId === 'notifications' && can('notifications', 'view') ? (
-        <NotificationsScreen onNavigate={setActiveNavId} />
+        <NotificationsScreen onNavigate={handleAppNavigate} />
       ) : activeNavId === 'audit-logs' && can('audit', 'view') ? (
         <AuditScreen />
       ) : activeNavId === 'backup' && can('backup', 'view') ? (
@@ -726,7 +740,7 @@ function RootApplication() {
           currency={session.organization.currency}
           canManageUsers={can('users', 'view')}
           canManageSettings={can('settings', 'view')}
-          onNavigate={setActiveNavId}
+          onNavigate={handleAppNavigate}
         />
       )}
 

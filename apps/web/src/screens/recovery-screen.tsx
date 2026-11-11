@@ -290,6 +290,13 @@ export function RecoveryScreen({
   const todayColumns: ColumnDef<RecoveryDueClientDto, unknown>[] = useMemo(
     () => [
       {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.index + 1} />,
+      },
+      {
         id: 'client',
         header: t('recovery.colClient'),
         size: 195,
@@ -552,6 +559,13 @@ export function RecoveryScreen({
 
   const agingColumns: ColumnDef<ClientAgingRowDto, unknown>[] = useMemo(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.index + 1} />,
+      },
       {
         id: 'client',
         header: t('recovery.colClient'),

@@ -23,6 +23,7 @@ import {
   FilterBar,
   FormField,
   FormLayout,
+  IntegerText,
   MoneyText,
   NumberInput,
   PageHeader,
@@ -359,6 +360,13 @@ export function PayrollScreen() {
   const employeeColumns = useMemo<ColumnDef<EmployeeDto, unknown>[]>(
     () => [
       {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
+      {
         accessorKey: 'name',
         header: t('payroll.employeeName', 'Employee'),
         cell: ({ row }) => (
@@ -442,6 +450,13 @@ export function PayrollScreen() {
   const advanceColumns = useMemo<ColumnDef<SalaryAdvanceDto, unknown>[]>(
     () => [
       {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
+      {
         accessorKey: 'advanceNo',
         header: t('payroll.advanceNo', 'Advance No'),
         cell: ({ row }) => <span className="font-mono font-medium">{row.original.advanceNo}</span>,
@@ -514,6 +529,13 @@ export function PayrollScreen() {
 
   const salaryColumns = useMemo<ColumnDef<SalaryRecordDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         accessorKey: 'salaryNo',
         header: t('payroll.salaryNo', 'Slip No'),

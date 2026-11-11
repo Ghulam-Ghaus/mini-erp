@@ -22,6 +22,7 @@ import {
   FilterBar,
   FormField,
   FormLayout,
+  IntegerText,
   LineItemGrid,
   MoneyText,
   NumberInput,
@@ -736,6 +737,13 @@ export function SalesInvoicesScreen({
 
   const columns = useMemo<ColumnDef<SaleInvoiceDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         id: 'invoiceNo',
         accessorKey: 'invoiceNo',

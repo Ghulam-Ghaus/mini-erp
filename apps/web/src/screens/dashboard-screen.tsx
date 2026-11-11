@@ -406,7 +406,7 @@ export function DashboardScreen({ orgName, currency, onNavigate }: DashboardScre
             <h4 className="text-xs font-semibold text-[#1f1e1b]">
               {t('dashboard.chequesDueSoon', 'Cheques Due (Next 7 Days)')}
             </h4>
-            <Button size="sm" variant="ghost" onClick={() => onNavigate('payments-cheques')}>
+            <Button size="sm" variant="ghost" onClick={() => onNavigate('cheques-register')}>
               {t('common.viewAll', 'View')}
             </Button>
           </div>

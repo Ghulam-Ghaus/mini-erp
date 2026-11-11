@@ -10,11 +10,13 @@ import {
   Button,
   DataTable,
   FilterBar,
+  IntegerText,
   PageHeader,
   Pagination,
   StatusBadge,
   useToast,
   type ColumnDef,
+  type DataTableColumnMeta,
 } from '@mini-erp/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
@@ -100,13 +102,13 @@ export function NotificationsScreen({ onNavigate }: NotificationsScreenProps) {
     (row: NotificationDto) => {
       if (!onNavigate) return;
       if (row.refType === 'CHEQUE') {
-        onNavigate('payments-cheques');
+        onNavigate('cheques-register');
       } else if (row.refType === 'CLIENT') {
         onNavigate('todays-recovery');
       } else if (row.refType === 'BATCH') {
         onNavigate('batches');
       } else if (row.refType === 'BACKUP') {
-        onNavigate('settings');
+        onNavigate('backup');
       }
     },
     [onNavigate],
@@ -114,6 +116,13 @@ export function NotificationsScreen({ onNavigate }: NotificationsScreenProps) {
 
   const columns = useMemo<ColumnDef<NotificationDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         accessorKey: 'severity',
         header: t('notifications.colSeverity', 'Severity'),

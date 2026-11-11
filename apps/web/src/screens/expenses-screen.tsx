@@ -18,6 +18,7 @@ import {
   FilterBar,
   FormField,
   FormLayout,
+  IntegerText,
   MoneyText,
   NumberInput,
   PageHeader,
@@ -193,6 +194,13 @@ export function ExpensesScreen() {
 
   const columns = useMemo<ColumnDef<ExpenseDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         accessorKey: 'expenseNo',
         header: t('expenses.expenseNo', 'Voucher No'),

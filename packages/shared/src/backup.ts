@@ -27,6 +27,7 @@ export const backupSummarySchema = z.object({
   totalBackups: z.number().int().nonnegative(),
   totalSizeBytes: z.number().nonnegative(),
   retentionCount: z.number().int().positive(),
+  backupDir: z.string().optional(),
 });
 export type BackupSummaryDto = z.infer<typeof backupSummarySchema>;
 

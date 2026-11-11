@@ -299,9 +299,48 @@ export class PaymentsService {
       throw new BadRequestException('Payment amount must be greater than zero');
     }
 
+    // Auto-allocate FIFO against oldest open PurchaseInvoices if caller did not specify allocations
+    let allocationsToApply = input.allocations;
+    if (allocationsToApply.length === 0) {
+      const openInvoices = await tx.purchaseInvoice.findMany({
+        where: {
+          organizationId,
+          supplierId: supplier.id,
+          status: { in: ['POSTED', 'PARTIAL'] },
+        },
+        orderBy: [{ invoiceDate: 'asc' }, { id: 'asc' }],
+      });
+
+      let remainingToAllocate = amountDec;
+      const autoAllocs: {
+        invoiceType: 'PURCHASE_INVOICE';
+        invoiceId: number;
+        amount: string;
+      }[] = [];
+
+      for (const inv of openInvoices) {
+        if (remainingToAllocate.lte(0)) break;
+        const netTotal = new Decimal(inv.total.toString()).minus(
+          new Decimal(inv.returnedAmount.toString()),
+        );
+        const currentPaid = new Decimal(inv.paidAmount.toString());
+        const openDue = Decimal.max(0, netTotal.minus(currentPaid));
+        if (openDue.lte(0)) continue;
+
+        const allocAmt = Decimal.min(remainingToAllocate, openDue);
+        autoAllocs.push({
+          invoiceType: 'PURCHASE_INVOICE',
+          invoiceId: inv.id,
+          amount: allocAmt.toFixed(2),
+        });
+        remainingToAllocate = remainingToAllocate.minus(allocAmt);
+      }
+      allocationsToApply = autoAllocs;
+    }
+
     // Validate allocations
     let allocatedSum = new Decimal(0);
-    for (const al of input.allocations) {
+    for (const al of allocationsToApply) {
       const alAmount = new Decimal(al.amount).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       allocatedSum = allocatedSum.plus(alAmount);
 
@@ -386,7 +425,7 @@ export class PaymentsService {
     }
 
     // Save allocations and update invoice paidAmount + status
-    for (const al of input.allocations) {
+    for (const al of allocationsToApply) {
       const alAmount = new Decimal(al.amount).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       const allocationId = await nextId(tx, 'payment_allocations');
       await tx.paymentAllocation.create({
@@ -522,9 +561,48 @@ export class PaymentsService {
       }
     }
 
+    // Auto-allocate FIFO against oldest open SaleInvoices if caller did not specify allocations
+    let allocationsToApply = input.allocations;
+    if (allocationsToApply.length === 0) {
+      const openSales = await tx.saleInvoice.findMany({
+        where: {
+          organizationId,
+          clientId: client.id,
+          status: { in: ['POSTED', 'PARTIAL'] },
+        },
+        orderBy: [{ saleDate: 'asc' }, { id: 'asc' }],
+      });
+
+      let remainingToAllocate = amountDec;
+      const autoAllocs: {
+        invoiceType: 'SALE_INVOICE';
+        invoiceId: number;
+        amount: string;
+      }[] = [];
+
+      for (const sale of openSales) {
+        if (remainingToAllocate.lte(0)) break;
+        const netTotal = new Decimal(sale.total.toString()).minus(
+          new Decimal(sale.returnedAmount.toString()),
+        );
+        const currentPaid = new Decimal(sale.paidAmount.toString());
+        const openDue = Decimal.max(0, netTotal.minus(currentPaid));
+        if (openDue.lte(0)) continue;
+
+        const allocAmt = Decimal.min(remainingToAllocate, openDue);
+        autoAllocs.push({
+          invoiceType: 'SALE_INVOICE',
+          invoiceId: sale.id,
+          amount: allocAmt.toFixed(2),
+        });
+        remainingToAllocate = remainingToAllocate.minus(allocAmt);
+      }
+      allocationsToApply = autoAllocs;
+    }
+
     // Validate allocations against open SaleInvoices
     let allocatedSum = new Decimal(0);
-    for (const al of input.allocations) {
+    for (const al of allocationsToApply) {
       const alAmount = new Decimal(al.amount).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       allocatedSum = allocatedSum.plus(alAmount);
 
@@ -611,7 +689,7 @@ export class PaymentsService {
     }
 
     // Save allocations and update SaleInvoice paidAmount + status
-    for (const al of input.allocations) {
+    for (const al of allocationsToApply) {
       const alAmount = new Decimal(al.amount).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       const allocationId = await nextId(tx, 'payment_allocations');
       await tx.paymentAllocation.create({

@@ -14,6 +14,7 @@ import {
   FilterBar,
   FormField,
   FormLayout,
+  IntegerText,
   MoneyText,
   NumberInput,
   PageHeader,
@@ -205,6 +206,13 @@ export function ClientsScreen({
 
   const columns = useMemo<ColumnDef<ClientDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         id: 'code',
         accessorKey: 'code',

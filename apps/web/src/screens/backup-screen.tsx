@@ -12,21 +12,23 @@ import {
   Dialog,
   FilterBar,
   FormField,
+  IntegerText,
   PageHeader,
   Pagination,
   StatusBadge,
   TextInput,
   useToast,
   type ColumnDef,
+  type DataTableColumnMeta,
 } from '@mini-erp/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   createManualBackup,
+  downloadBackupArchive,
   fetchBackupLogs,
   fetchBackupSummary,
-  getBackupDownloadUrl,
   restoreBackup,
 } from '../lib/api.js';
 
@@ -136,13 +138,63 @@ export function BackupScreen() {
     },
   });
 
-  const handleDownload = (id: number) => {
-    const url = getBackupDownloadUrl(id);
-    window.open(url, '_blank');
-  };
+  const summary = summaryQuery.data;
+
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  const handleDownload = useCallback(
+    async (id: number) => {
+      try {
+        setDownloadingId(id);
+        await downloadBackupArchive(id);
+      } catch (err) {
+        showToast({
+          title: err instanceof Error ? err.message : t('backup.downloadFailed', 'Download failed'),
+          tone: 'danger',
+        });
+      } finally {
+        setDownloadingId(null);
+      }
+    },
+    [showToast, t],
+  );
+
+  const handleOpenFolder = useCallback(
+    async (folderPath?: string | null) => {
+      const target = folderPath || summary?.backupDir;
+      if (!target) {
+        showToast({
+          title: t('backup.folderUnavailable', 'Backup folder path not available yet'),
+          tone: 'warning',
+        });
+        return;
+      }
+      if (window.desktop?.openFolder) {
+        const ok = await window.desktop.openFolder(target);
+        if (!ok) {
+          showToast({ title: `Could not open folder: ${target}`, tone: 'danger' });
+        }
+        return;
+      }
+      try {
+        await navigator.clipboard?.writeText(target);
+        showToast({ title: `Backup folder path copied: ${target}`, tone: 'success' });
+      } catch {
+        showToast({ title: `Backup folder: ${target}`, tone: 'neutral' });
+      }
+    },
+    [summary?.backupDir, showToast, t],
+  );
 
   const columns = useMemo<ColumnDef<BackupLogDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         accessorKey: 'createdAt',
         header: t('backup.colTime', 'Created At'),
@@ -197,8 +249,15 @@ export function BackupScreen() {
           if (row.original.status !== 'SUCCESS') return null;
           return (
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="secondary" onClick={() => handleDownload(row.original.id)}>
-                {t('backup.download', 'Download ZIP')}
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={downloadingId === row.original.id}
+                onClick={() => void handleDownload(row.original.id)}
+              >
+                {downloadingId === row.original.id
+                  ? t('backup.downloading', 'Downloading...')
+                  : t('backup.download', 'Download ZIP')}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setRestoreTarget(row.original)}>
                 {t('backup.restore', 'Restore')}
@@ -208,10 +267,8 @@ export function BackupScreen() {
         },
       },
     ],
-    [t],
+    [t, downloadingId, handleDownload],
   );
-
-  const summary = summaryQuery.data;
 
   return (
     <div className="flex h-full flex-col">
@@ -222,15 +279,22 @@ export function BackupScreen() {
           'Automated daily backups, compressed archive generation with proofs/uploads, retention management, and secure database restore',
         )}
         secondaryActions={
-          <Button
-            variant="primary"
-            onClick={() => createMutation.mutate()}
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending
-              ? t('backup.creating', 'Generating Backup...')
-              : t('backup.createNow', 'Create Backup Now')}
-          </Button>
+          <div className="flex items-center gap-2">
+            {summary?.backupDir && (
+              <Button variant="secondary" onClick={() => void handleOpenFolder(summary.backupDir)}>
+                {t('backup.openFolder', 'Open Backup Folder')}
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending
+                ? t('backup.creating', 'Generating Backup...')
+                : t('backup.createNow', 'Create Backup Now')}
+            </Button>
+          </div>
         }
       />
 
@@ -357,13 +421,37 @@ export function BackupScreen() {
             }
           }}
           title={t('backup.restoreConfirmTitle', 'Confirm Database Restore')}
+          maxWidthClass="max-w-md"
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                disabled={restoreMutation.isPending}
+                onClick={() => {
+                  setRestoreTarget(null);
+                  setConfirmInput('');
+                }}
+              >
+                {t('common.cancel', 'Cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                disabled={confirmInput !== 'RESTORE' || restoreMutation.isPending}
+                onClick={() => restoreMutation.mutate(restoreTarget.id)}
+              >
+                {restoreMutation.isPending
+                  ? t('backup.restoring', 'Restoring...')
+                  : t('backup.confirmRestore', 'Confirm & Restore')}
+              </Button>
+            </>
+          }
         >
-          <div className="flex flex-col gap-4 text-xs">
+          <div className="flex flex-col gap-4 p-4 text-xs">
             <div className="rounded border border-[#ead0cd] bg-[#fbf2f1] p-3 text-[#9e3b33]">
               <p className="font-semibold">
                 {t('backup.restoreWarningTitle', 'High Risk Action: Database Snapshot Overwrite')}
               </p>
-              <p className="mt-1">
+              <p className="mt-1 leading-relaxed">
                 {t(
                   'backup.restoreWarningBody',
                   'Restoring this backup (ID: {{id}}, created: {{date}}) will replace existing database records. An automated pre-restore backup will be created immediately before restore to protect current data.',
@@ -386,28 +474,6 @@ export function BackupScreen() {
                 autoFocus
               />
             </FormField>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                variant="secondary"
-                disabled={restoreMutation.isPending}
-                onClick={() => {
-                  setRestoreTarget(null);
-                  setConfirmInput('');
-                }}
-              >
-                {t('common.cancel', 'Cancel')}
-              </Button>
-              <Button
-                variant="danger"
-                disabled={confirmInput !== 'RESTORE' || restoreMutation.isPending}
-                onClick={() => restoreMutation.mutate(restoreTarget.id)}
-              >
-                {restoreMutation.isPending
-                  ? t('backup.restoring', 'Restoring...')
-                  : t('backup.confirmRestore', 'Confirm & Restore')}
-              </Button>
-            </div>
           </div>
         </Dialog>
       )}

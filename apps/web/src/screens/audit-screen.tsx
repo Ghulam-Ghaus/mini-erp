@@ -9,10 +9,12 @@ import {
   DataTable,
   Dialog,
   FilterBar,
+  IntegerText,
   PageHeader,
   Pagination,
   StatusBadge,
   type ColumnDef,
+  type DataTableColumnMeta,
 } from '@mini-erp/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -72,6 +74,13 @@ export function AuditScreen() {
 
   const columns = useMemo<ColumnDef<AuditLogDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         accessorKey: 'createdAt',
         header: t('audit.colTime', 'Timestamp'),

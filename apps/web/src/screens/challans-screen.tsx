@@ -15,6 +15,7 @@ import {
   Dialog,
   FilterBar,
   FormField,
+  IntegerText,
   PageHeader,
   Pagination,
   Select,
@@ -22,6 +23,7 @@ import {
   TextInput,
   useToast,
   type ColumnDef,
+  type DataTableColumnMeta,
 } from '@mini-erp/ui';
 import { createChallan, fetchChallans, fetchSales, updateChallanStatus } from '../lib/api';
 import { PrintDocumentDialog, type PrintableDocument } from '../components/print-document-dialog';
@@ -138,6 +140,13 @@ export function ChallansScreen() {
 
   const columns = useMemo<ColumnDef<ChallanDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         accessorKey: 'challanNo',
         header: t('challans.challanNo', 'Challan No'),

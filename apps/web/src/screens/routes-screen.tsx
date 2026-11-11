@@ -12,6 +12,7 @@ import {
   Dialog,
   FilterBar,
   FormField,
+  IntegerText,
   PageHeader,
   Pagination,
   RowActions,
@@ -152,6 +153,13 @@ export function RoutesScreen({ canCreate, canEdit }: RoutesScreenProps) {
 
   const columns = useMemo<ColumnDef<RouteDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         id: 'code',
         accessorKey: 'code',

@@ -1,11 +1,12 @@
 import {
   DESKTOP_CONFIG_CHANNEL,
   DESKTOP_NOTIFY_CHANNEL,
+  DESKTOP_OPEN_FOLDER_CHANNEL,
   HEALTH_PATH,
   type DesktopBridge,
   type DesktopNotificationPayload,
 } from '@mini-erp/shared';
-import { app, BrowserWindow, dialog, ipcMain, Notification, session } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, session, shell } from 'electron';
 import { watch, type FSWatcher } from 'node:fs';
 import path from 'node:path';
 import { ApiProcess } from './api-process.js';
@@ -49,6 +50,12 @@ ipcMain.on(DESKTOP_NOTIFY_CHANNEL, (_event, payload: DesktopNotificationPayload)
       body: payload.body,
     }).show();
   }
+});
+
+ipcMain.handle(DESKTOP_OPEN_FOLDER_CHANNEL, async (_event, folderPath: unknown) => {
+  if (typeof folderPath !== 'string' || folderPath.trim().length === 0) return false;
+  const err = await shell.openPath(folderPath);
+  return err === '';
 });
 
 ipcMain.handle('app:check-for-updates', () => {

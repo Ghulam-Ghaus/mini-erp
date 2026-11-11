@@ -205,7 +205,7 @@ async function seedSaleScenario() {
     1,
   );
 
-  return { org, client, supplier, sale };
+  return { org, client, supplier, sale, batch, item };
 }
 
 describe('Phase 6 — Payments In, Cheques Lifecycle, Proof Upload & Ledger Allocation', () => {
@@ -398,5 +398,103 @@ describe('Phase 6 — Payments In, Cheques Lifecycle, Proof Upload & Ledger Allo
     expect((await clientsService.getClientById(org.id, client.id)).currentBalance).toBe('25000.00');
     expect((await salesService.getSaleById(org.id, sale.id)).paidAmount).toBe('0.00');
     expect((await salesService.getSaleById(org.id, sale.id)).status).toBe('POSTED');
+  });
+
+  it('auto-allocates FIFO across oldest open invoices when allocations are empty and credits excess to client account', async () => {
+    const { org, batch, item } = await seedSaleScenario();
+
+    const client2 = await clientsService.createClient(
+      org.id,
+      {
+        name: 'FIFO Client',
+        creditLimit: '0.00',
+        openingBalance: '0.00',
+        isActive: true,
+      },
+      1,
+    );
+
+    // Invoice 1: 10.00
+    const inv1 = await salesService.createSaleInvoice(
+      org.id,
+      {
+        clientId: client2.id,
+        saleDate: '2026-11-03',
+        discount: '0.00',
+        extraCharges: '0.00',
+        lines: [
+          {
+            batchId: batch.id,
+            itemId: item.id,
+            enteredQty: '1.000',
+            enteredUnit: 'KG',
+            conversionFactor: '1.000',
+            ratePerEnteredUnit: '10.0000',
+            taxRate: '0.00',
+          },
+        ],
+      },
+      1,
+    );
+
+    // Invoice 2: 30.00
+    const inv2 = await salesService.createSaleInvoice(
+      org.id,
+      {
+        clientId: client2.id,
+        saleDate: '2026-11-04',
+        discount: '0.00',
+        extraCharges: '0.00',
+        lines: [
+          {
+            batchId: batch.id,
+            itemId: item.id,
+            enteredQty: '1.000',
+            enteredUnit: 'KG',
+            conversionFactor: '1.000',
+            ratePerEnteredUnit: '30.0000',
+            taxRate: '0.00',
+          },
+        ],
+      },
+      1,
+    );
+
+    // Pay 25.00 with empty allocations -> 10.00 fills inv1 (PAID), 15.00 goes to inv2 (PARTIAL)
+    const pay1 = await paymentsService.createClientPayment(org.id, 1, {
+      clientId: client2.id,
+      paymentDate: '2026-11-05',
+      method: 'CASH',
+      amount: '25.00',
+      allocations: [],
+    });
+
+    expect(pay1.allocatedAmount).toBe('25.00');
+    expect(pay1.unallocatedAmount).toBe('0.00');
+
+    const inv1After1 = await salesService.getSaleById(org.id, inv1.id);
+    const inv2After1 = await salesService.getSaleById(org.id, inv2.id);
+    expect(inv1After1.status).toBe('PAID');
+    expect(inv1After1.balanceDue).toBe('0.00');
+    expect(inv2After1.status).toBe('PARTIAL');
+    expect(inv2After1.paidAmount).toBe('15.00');
+    expect(inv2After1.balanceDue).toBe('15.00');
+
+    // Pay 25.00 more (total 50.00 against 40.00 invoices) -> remaining 15.00 closes inv2 (PAID), 10.00 credited to client account (-10.00)
+    const pay2 = await paymentsService.createClientPayment(org.id, 1, {
+      clientId: client2.id,
+      paymentDate: '2026-11-06',
+      method: 'CASH',
+      amount: '25.00',
+      allocations: [],
+    });
+
+    expect(pay2.allocatedAmount).toBe('15.00');
+    expect(pay2.unallocatedAmount).toBe('10.00');
+
+    const inv2After2 = await salesService.getSaleById(org.id, inv2.id);
+    expect(inv2After2.status).toBe('PAID');
+    expect(inv2After2.balanceDue).toBe('0.00');
+    expect((await clientsService.getClientById(org.id, client2.id)).currentBalance).toBe('-10.00');
   });
 });

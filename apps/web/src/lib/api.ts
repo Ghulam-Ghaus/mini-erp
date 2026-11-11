@@ -1176,5 +1176,33 @@ export function restoreBackup(
 
 export function getBackupDownloadUrl(backupId: number): string {
   const base = getApiBaseUrl();
-  return `${base}/api/backups/${backupId}/download`;
+  return `${base}/backups/${backupId}/download`;
+}
+
+export async function downloadBackupArchive(backupId: number): Promise<void> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(getBackupDownloadUrl(backupId), { headers });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
+    const rawMsg = body?.message;
+    const msg = Array.isArray(rawMsg) ? rawMsg.join(', ') : (rawMsg ?? `HTTP ${res.status}`);
+    throw new ApiClientError(msg, res.status);
+  }
+  const blob = await res.blob();
+  const disp = res.headers.get('content-disposition') ?? '';
+  const match = /filename="?([^";]+)"?/i.exec(disp);
+  const filename = match?.[1] ?? `backup-${backupId}.zip`;
+
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
 }

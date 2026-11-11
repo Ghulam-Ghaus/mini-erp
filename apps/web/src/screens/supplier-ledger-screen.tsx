@@ -72,7 +72,12 @@ export function SupplierLedgerScreen({
   useEffect(() => {
     if (initialSupplierId) {
       setSelectedSupplierId(initialSupplierId);
-    } else if (!selectedSupplierId && suppliers[0]) {
+      setPage(1);
+    }
+  }, [initialSupplierId]);
+
+  useEffect(() => {
+    if (!initialSupplierId && !selectedSupplierId && suppliers[0]) {
       setSelectedSupplierId(suppliers[0].id);
     }
   }, [initialSupplierId, selectedSupplierId, suppliers]);
@@ -289,6 +294,13 @@ export function SupplierLedgerScreen({
   const purchaseColumns: ColumnDef<PurchaseInvoiceDto, unknown>[] = useMemo(
     () => [
       {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
+      {
         id: 'invoiceNo',
         header: t('purchases.colInvoiceNo'),
         size: 140,
@@ -390,6 +402,13 @@ export function SupplierLedgerScreen({
   const returnColumns: ColumnDef<PurchaseReturnDto, unknown>[] = useMemo(
     () => [
       {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
+      {
         id: 'returnNo',
         header: t('purchaseReturns.colReturnNo'),
         size: 140,
@@ -437,6 +456,13 @@ export function SupplierLedgerScreen({
 
   const paymentColumns: ColumnDef<PaymentDto, unknown>[] = useMemo(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         id: 'paymentNo',
         header: t('payments.colPaymentNo'),

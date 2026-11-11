@@ -10,6 +10,7 @@ import {
   Combobox,
   DataTable,
   FilterBar,
+  IntegerText,
   MoneyText,
   PageHeader,
   Pagination,
@@ -58,7 +59,12 @@ export function Client360Screen({
   useEffect(() => {
     if (initialClientId) {
       setSelectedClientId(initialClientId);
-    } else if (!selectedClientId && clients[0]) {
+      setPage(1);
+    }
+  }, [initialClientId]);
+
+  useEffect(() => {
+    if (!initialClientId && !selectedClientId && clients[0]) {
       setSelectedClientId(clients[0].id);
     }
   }, [initialClientId, selectedClientId, clients]);
@@ -125,6 +131,13 @@ export function Client360Screen({
 
   const ledgerColumns = useMemo<ColumnDef<LedgerEntryDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         id: 'entryDate',
         accessorKey: 'entryDate',
@@ -228,6 +241,13 @@ export function Client360Screen({
 
   const salesColumns = useMemo<ColumnDef<SaleInvoiceDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         id: 'invoiceNo',
         accessorKey: 'invoiceNo',
@@ -345,6 +365,13 @@ export function Client360Screen({
 
   const returnsColumns = useMemo<ColumnDef<SaleReturnDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         id: 'returnNo',
         accessorKey: 'returnNo',

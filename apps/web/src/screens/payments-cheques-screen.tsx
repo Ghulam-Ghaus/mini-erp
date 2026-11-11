@@ -62,10 +62,44 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function computeFifoAllocations(
+  totalAmountStr: string,
+  invoices: ReadonlyArray<{ id: number; balanceDue: string }>,
+  priorityInvoiceId?: number | null,
+): Record<number, string> {
+  let remaining = new Decimal(0);
+  try {
+    remaining = new Decimal(totalAmountStr || '0');
+  } catch {
+    remaining = new Decimal(0);
+  }
+  const next: Record<number, string> = {};
+  if (remaining.lte(0) || invoices.length === 0) return next;
+
+  const ordered = priorityInvoiceId
+    ? [
+        ...invoices.filter((i) => i.id === priorityInvoiceId),
+        ...invoices.filter((i) => i.id !== priorityInvoiceId),
+      ]
+    : invoices;
+
+  for (const inv of ordered) {
+    if (remaining.lte(0)) break;
+    const due = new Decimal(inv.balanceDue || '0');
+    if (due.lte(0)) continue;
+    const alloc = Decimal.min(remaining, due);
+    next[inv.id] = alloc.toFixed(2);
+    remaining = remaining.minus(alloc);
+  }
+  return next;
+}
+
 export interface PaymentsChequesScreenProps {
   readonly canCreate: boolean;
   readonly canEdit: boolean;
   readonly canVoid: boolean;
+  readonly requestedTab?: 'receipts-in' | 'cheques' | 'payments-out' | null;
+  readonly onClearRequestedTab?: () => void;
   readonly prefillClientId?: number | null;
   readonly prefillSaleId?: number | null;
   readonly prefillSupplierId?: number | null;
@@ -81,6 +115,8 @@ export function PaymentsChequesScreen({
   canCreate,
   canEdit,
   canVoid,
+  requestedTab,
+  onClearRequestedTab,
   prefillClientId,
   prefillSaleId,
   prefillSupplierId,
@@ -99,14 +135,17 @@ export function PaymentsChequesScreen({
     'receipts-in',
   );
 
-  // Switch tab automatically if supplier prefill is passed
+  // Switch tab automatically if requested or prefill is passed
   useEffect(() => {
-    if (prefillSupplierId) {
+    if (requestedTab) {
+      setActiveTab(requestedTab);
+      onClearRequestedTab?.();
+    } else if (prefillSupplierId) {
       setActiveTab('payments-out');
     } else if (prefillClientId) {
       setActiveTab('receipts-in');
     }
-  }, [prefillSupplierId, prefillClientId]);
+  }, [requestedTab, onClearRequestedTab, prefillSupplierId, prefillClientId]);
 
   // --- Tab 1: Client Receipts (Payments In) state ---
   const [search, setSearch] = useState('');
@@ -133,6 +172,8 @@ export function PaymentsChequesScreen({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofDataUrl, setProofDataUrl] = useState<string | undefined>(undefined);
   const [allocations, setAllocations] = useState<Record<number, string>>({});
+  const [allocationsManuallyEdited, setAllocationsManuallyEdited] = useState(false);
+  const [prioritySaleId, setPrioritySaleId] = useState<number | null>(null);
 
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentDto | null>(null);
   const [voidReason, setVoidReason] = useState('');
@@ -253,6 +294,8 @@ export function PaymentsChequesScreen({
     setProofFile(null);
     setProofDataUrl(undefined);
     setAllocations({});
+    setAllocationsManuallyEdited(false);
+    setPrioritySaleId(forSaleId ?? null);
     setReceiptDrawerOpen(true);
 
     if (forSaleId) {
@@ -272,16 +315,30 @@ export function PaymentsChequesScreen({
   }, [prefillClientId, prefillSaleId, clients.length]);
 
   useEffect(() => {
+    let resolvedAuto = false;
     for (const [invIdStr, val] of Object.entries(allocations)) {
       if (val === 'AUTO') {
         const inv = openSaleInvoices.find((i) => i.id === Number(invIdStr));
         if (inv) {
           setAllocations({ [inv.id]: inv.balanceDue });
           setAmount(inv.balanceDue);
+          resolvedAuto = true;
         }
       }
     }
-  }, [allocations, openSaleInvoices]);
+    if (
+      !resolvedAuto &&
+      receiptDrawerOpen &&
+      !allocationsManuallyEdited &&
+      !allocations[prioritySaleId ?? -1]?.includes('AUTO')
+    ) {
+      const hasAutoPlaceholder = Object.values(allocations).includes('AUTO');
+      if (!hasAutoPlaceholder) {
+        setAllocations(computeFifoAllocations(amount, openSaleInvoices, prioritySaleId));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiptDrawerOpen, openSaleInvoices, amount, allocationsManuallyEdited, prioritySaleId]);
 
   useHotkeys([
     {
@@ -296,16 +353,8 @@ export function PaymentsChequesScreen({
   ]);
 
   const handleAutoAllocateSales = () => {
-    let remaining = new Decimal(amount || '0');
-    const next: Record<number, string> = {};
-    for (const inv of openSaleInvoices) {
-      if (remaining.lte(0)) break;
-      const due = new Decimal(inv.balanceDue);
-      const alloc = Decimal.min(remaining, due);
-      next[inv.id] = alloc.toFixed(2);
-      remaining = remaining.minus(alloc);
-    }
-    setAllocations(next);
+    setAllocationsManuallyEdited(false);
+    setAllocations(computeFifoAllocations(amount, openSaleInvoices, prioritySaleId));
   };
 
   const createReceiptMutation = useMutation({
@@ -743,55 +792,55 @@ export function PaymentsChequesScreen({
       {
         id: 'actions',
         header: t('common.actions'),
-        size: 210,
+        size: 195,
         enableSorting: false,
         meta: { align: 'right' } satisfies DataTableColumnMeta,
         cell: ({ row }) => {
           const c = row.original;
           const canDeposit = canEdit && c.status === 'RECEIVED';
           const canClearOrBounce = canEdit && (c.status === 'RECEIVED' || c.status === 'DEPOSITED');
-          return (
-            <RowActions
-              actions={[
-                {
-                  id: 'deposit',
-                  label: t('payments.actionDeposit'),
-                  inline: true,
-                  disabled: !canDeposit,
-                  onClick: () => {
-                    setActionDate(new Date().toISOString().slice(0, 10));
-                    setDepositBankInput('');
-                    setActionNotesInput('');
-                    setChequeActionModal({ cheque: c, targetStatus: 'DEPOSITED' });
-                  },
-                },
-                {
-                  id: 'clear',
-                  label: t('payments.actionClear'),
-                  inline: true,
-                  disabled: !canClearOrBounce,
-                  onClick: () => {
-                    setActionDate(new Date().toISOString().slice(0, 10));
-                    setActionNotesInput('');
-                    setChequeActionModal({ cheque: c, targetStatus: 'CLEARED' });
-                  },
-                },
-                {
-                  id: 'bounce',
-                  label: t('payments.actionBounce'),
-                  tone: 'danger',
-                  disabled: !canClearOrBounce,
-                  onClick: () => {
-                    setActionDate(new Date().toISOString().slice(0, 10));
-                    setBounceReasonInput('');
-                    setBounceFeeInput('0.00');
-                    setActionNotesInput('');
-                    setChequeActionModal({ cheque: c, targetStatus: 'BOUNCED' });
-                  },
-                },
-              ]}
-            />
-          );
+          if (!canDeposit && !canClearOrBounce) {
+            return <span className="text-xs text-[#8c8980]">—</span>;
+          }
+          const actions = [];
+          if (canDeposit) {
+            actions.push({
+              id: 'deposit',
+              label: t('payments.actionDepositShort', 'Deposit'),
+              inline: true,
+              onClick: () => {
+                setActionDate(new Date().toISOString().slice(0, 10));
+                setDepositBankInput('');
+                setActionNotesInput('');
+                setChequeActionModal({ cheque: c, targetStatus: 'DEPOSITED' });
+              },
+            });
+          }
+          if (canClearOrBounce) {
+            actions.push({
+              id: 'clear',
+              label: t('payments.actionClearShort', 'Clear'),
+              inline: true,
+              onClick: () => {
+                setActionDate(new Date().toISOString().slice(0, 10));
+                setActionNotesInput('');
+                setChequeActionModal({ cheque: c, targetStatus: 'CLEARED' });
+              },
+            });
+            actions.push({
+              id: 'bounce',
+              label: t('payments.actionBounce'),
+              tone: 'danger' as const,
+              onClick: () => {
+                setActionDate(new Date().toISOString().slice(0, 10));
+                setBounceReasonInput('');
+                setBounceFeeInput('0.00');
+                setActionNotesInput('');
+                setChequeActionModal({ cheque: c, targetStatus: 'BOUNCED' });
+              },
+            });
+          }
+          return <RowActions actions={actions} />;
         },
       },
     ],
@@ -1093,15 +1142,43 @@ export function PaymentsChequesScreen({
                                 ? inv.balanceDue
                                 : (allocations[inv.id] ?? '0.00')
                             }
-                            onChange={(val) =>
-                              setAllocations((prev) => ({ ...prev, [inv.id]: val }))
-                            }
+                            onChange={(val) => {
+                              setAllocationsManuallyEdited(true);
+                              setAllocations((prev) => ({ ...prev, [inv.id]: val }));
+                            }}
                           />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {(() => {
+                  const enteredAmt = new Decimal(amount || '0');
+                  const allocatedTotal = Object.values(allocations).reduce((acc, v) => {
+                    try {
+                      return v !== 'AUTO' ? acc.plus(new Decimal(v || '0')) : acc;
+                    } catch {
+                      return acc;
+                    }
+                  }, new Decimal(0));
+                  const creditExcess = Decimal.max(0, enteredAmt.minus(allocatedTotal));
+                  return (
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#5c5a53]">
+                      <span>
+                        Allocated to Invoices:{' '}
+                        <strong className="erp-num text-[#1f1e1b]">
+                          {allocatedTotal.toFixed(2)}
+                        </strong>
+                      </span>
+                      {creditExcess.gt(0) && (
+                        <span className="font-medium text-[#2c6b48]">
+                          Credited to Client Account:{' '}
+                          <strong className="erp-num">{creditExcess.toFixed(2)}</strong>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )
           }
@@ -1112,6 +1189,8 @@ export function PaymentsChequesScreen({
               onChange={(e) => {
                 setClientId(Number(e.target.value));
                 setAllocations({});
+                setAllocationsManuallyEdited(false);
+                setPrioritySaleId(null);
               }}
               options={clients.map((c) => ({
                 value: String(c.id),
@@ -1141,18 +1220,6 @@ export function PaymentsChequesScreen({
               value={amount}
               onChange={(val) => {
                 setAmount(val);
-                if (openSaleInvoices.length > 0 && Object.keys(allocations).length === 0) {
-                  let remaining = new Decimal(val || '0');
-                  const next: Record<number, string> = {};
-                  for (const inv of openSaleInvoices) {
-                    if (remaining.lte(0)) break;
-                    const due = new Decimal(inv.balanceDue);
-                    const alloc = Decimal.min(remaining, due);
-                    next[inv.id] = alloc.toFixed(2);
-                    remaining = remaining.minus(alloc);
-                  }
-                  setAllocations(next);
-                }
               }}
             />
           </FormField>

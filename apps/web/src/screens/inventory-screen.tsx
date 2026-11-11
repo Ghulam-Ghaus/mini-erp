@@ -113,6 +113,13 @@ export function InventoryScreen({ onOpenBatch360 }: InventoryScreenProps) {
   const batchStockColumns = useMemo<ColumnDef<BatchSummaryDto, unknown>[]>(
     () => [
       {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.index + 1} />,
+      },
+      {
         id: 'batchNo',
         accessorKey: 'batchNo',
         header: t('batches.colBatchNo'),
@@ -204,6 +211,13 @@ export function InventoryScreen({ onOpenBatch360 }: InventoryScreenProps) {
 
   const rawItemColumns = useMemo<ColumnDef<ItemDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.index + 1} />,
+      },
       {
         id: 'code',
         accessorKey: 'code',

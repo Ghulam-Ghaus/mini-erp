@@ -22,6 +22,7 @@ import {
   FilterBar,
   FormField,
   FormLayout,
+  IntegerText,
   MoneyText,
   NumberInput,
   PageHeader,
@@ -350,6 +351,13 @@ export function SaleReturnsScreen({
 
   const columns = useMemo<ColumnDef<SaleReturnDto, unknown>[]>(
     () => [
+      {
+        id: 'id',
+        header: '#',
+        size: 55,
+        meta: { align: 'right' } satisfies DataTableColumnMeta,
+        cell: ({ row }) => <IntegerText value={row.original.id} />,
+      },
       {
         id: 'returnNo',
         accessorKey: 'returnNo',

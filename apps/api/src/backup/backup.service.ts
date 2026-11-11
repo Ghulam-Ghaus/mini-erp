@@ -350,6 +350,7 @@ export class BackupService {
       totalBackups,
       totalSizeBytes,
       retentionCount: DEFAULT_RETENTION_COUNT,
+      backupDir: this.getBackupDirectory(orgId),
     };
   }
 

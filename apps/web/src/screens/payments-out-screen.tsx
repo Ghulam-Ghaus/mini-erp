@@ -53,6 +53,38 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function computeFifoPurchaseAllocations(
+  totalAmountStr: string,
+  invoices: ReadonlyArray<{ id: number; balanceDue: string }>,
+  priorityInvoiceId?: number | null,
+): Record<number, string> {
+  let remaining = new Decimal(0);
+  try {
+    remaining = new Decimal(totalAmountStr || '0');
+  } catch {
+    remaining = new Decimal(0);
+  }
+  const next: Record<number, string> = {};
+  if (remaining.lte(0) || invoices.length === 0) return next;
+
+  const ordered = priorityInvoiceId
+    ? [
+        ...invoices.filter((i) => i.id === priorityInvoiceId),
+        ...invoices.filter((i) => i.id !== priorityInvoiceId),
+      ]
+    : invoices;
+
+  for (const inv of ordered) {
+    if (remaining.lte(0)) break;
+    const due = new Decimal(inv.balanceDue || '0');
+    if (due.lte(0)) continue;
+    const alloc = Decimal.min(remaining, due);
+    next[inv.id] = alloc.toFixed(2);
+    remaining = remaining.minus(alloc);
+  }
+  return next;
+}
+
 export interface PaymentsOutScreenProps {
   readonly canCreate: boolean;
   readonly canVoid: boolean;
@@ -100,6 +132,8 @@ export function PaymentsOutScreen({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofDataUrl, setProofDataUrl] = useState<string | undefined>(undefined);
   const [allocations, setAllocations] = useState<Record<number, string>>({});
+  const [allocationsManuallyEdited, setAllocationsManuallyEdited] = useState(false);
+  const [priorityPurchaseId, setPriorityPurchaseId] = useState<number | null>(null);
 
   // Detail & Void Drawer
   const [selectedPayment, setSelectedPayment] = useState<PaymentDto | null>(null);
@@ -168,6 +202,8 @@ export function PaymentsOutScreen({
     setProofFile(null);
     setProofDataUrl(undefined);
     setAllocations({});
+    setAllocationsManuallyEdited(false);
+    setPriorityPurchaseId(forPurchaseId ?? null);
     setDrawerOpen(true);
 
     if (forPurchaseId) {
@@ -188,16 +224,25 @@ export function PaymentsOutScreen({
 
   useEffect(() => {
     // Resolve 'AUTO' pre-fill once openInvoices for that supplier finishes loading
+    let resolvedAuto = false;
     for (const [invIdStr, val] of Object.entries(allocations)) {
       if (val === 'AUTO') {
         const inv = openInvoices.find((i) => i.id === Number(invIdStr));
         if (inv) {
           setAllocations({ [inv.id]: inv.balanceDue });
           setAmount(inv.balanceDue);
+          resolvedAuto = true;
         }
       }
     }
-  }, [allocations, openInvoices]);
+    if (!resolvedAuto && drawerOpen && !allocationsManuallyEdited) {
+      const hasAutoPlaceholder = Object.values(allocations).includes('AUTO');
+      if (!hasAutoPlaceholder) {
+        setAllocations(computeFifoPurchaseAllocations(amount, openInvoices, priorityPurchaseId));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerOpen, openInvoices, amount, allocationsManuallyEdited, priorityPurchaseId]);
 
   useHotkeys([
     {
@@ -210,16 +255,8 @@ export function PaymentsOutScreen({
   ]);
 
   const handleAutoAllocate = () => {
-    let remaining = new Decimal(amount || '0');
-    const next: Record<number, string> = {};
-    for (const inv of openInvoices) {
-      if (remaining.lte(0)) break;
-      const due = new Decimal(inv.balanceDue);
-      const alloc = Decimal.min(remaining, due);
-      next[inv.id] = alloc.toFixed(2);
-      remaining = remaining.minus(alloc);
-    }
-    setAllocations(next);
+    setAllocationsManuallyEdited(false);
+    setAllocations(computeFifoPurchaseAllocations(amount, openInvoices, priorityPurchaseId));
   };
 
   const createMutation = useMutation({
@@ -600,15 +637,43 @@ export function PaymentsOutScreen({
                                 ? inv.balanceDue
                                 : (allocations[inv.id] ?? '0.00')
                             }
-                            onChange={(val) =>
-                              setAllocations((prev) => ({ ...prev, [inv.id]: val }))
-                            }
+                            onChange={(val) => {
+                              setAllocationsManuallyEdited(true);
+                              setAllocations((prev) => ({ ...prev, [inv.id]: val }));
+                            }}
                           />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                {(() => {
+                  const enteredAmt = new Decimal(amount || '0');
+                  const allocatedTotal = Object.values(allocations).reduce((acc, v) => {
+                    try {
+                      return v !== 'AUTO' ? acc.plus(new Decimal(v || '0')) : acc;
+                    } catch {
+                      return acc;
+                    }
+                  }, new Decimal(0));
+                  const creditExcess = Decimal.max(0, enteredAmt.minus(allocatedTotal));
+                  return (
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#5c5a53]">
+                      <span>
+                        Allocated to Invoices:{' '}
+                        <strong className="erp-num text-[#1f1e1b]">
+                          {allocatedTotal.toFixed(2)}
+                        </strong>
+                      </span>
+                      {creditExcess.gt(0) && (
+                        <span className="font-medium text-[#2c6b48]">
+                          Credited to Supplier Account:{' '}
+                          <strong className="erp-num">{creditExcess.toFixed(2)}</strong>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )
           }
@@ -619,6 +684,8 @@ export function PaymentsOutScreen({
               onChange={(e) => {
                 setSupplierId(Number(e.target.value));
                 setAllocations({});
+                setAllocationsManuallyEdited(false);
+                setPriorityPurchaseId(null);
               }}
               options={suppliers.map((s) => ({
                 value: String(s.id),
