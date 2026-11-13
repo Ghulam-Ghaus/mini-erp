@@ -497,4 +497,45 @@ describe('Phase 6 — Payments In, Cheques Lifecycle, Proof Upload & Ledger Allo
     expect(inv2After2.balanceDue).toBe('0.00');
     expect((await clientsService.getClientById(org.id, client2.id)).currentBalance).toBe('-10.00');
   });
+
+  it('blocks voiding a payment whose linked cheque has already cleared', async () => {
+    const { org, client, sale } = await seedSaleScenario();
+
+    const chequePayment = await paymentsService.createClientPayment(org.id, 1, {
+      clientId: client.id,
+      paymentDate: '2026-11-04',
+      method: 'CHEQUE',
+      amount: '25000.00',
+      referenceNo: 'CHQ-LOCK-999',
+      bankName: 'UBL',
+      chequeDate: '2026-11-05',
+      proofDataUrl: DUMMY_PROOF,
+      proofFileName: 'cleared-cheque.png',
+      allocations: [{ invoiceType: 'SALE_INVOICE', invoiceId: sale.id, amount: '25000.00' }],
+    });
+
+    const chequesList = await paymentsService.listCheques(org.id, {
+      page: 1,
+      pageSize: 25,
+      sortOrder: 'desc',
+    });
+    const cheque = chequesList.data[0]!;
+
+    await paymentsService.updateChequeStatus(org.id, 1, cheque.id, {
+      status: 'DEPOSITED',
+      depositDate: '2026-11-05',
+      bounceFee: '0.00',
+    });
+    await paymentsService.updateChequeStatus(org.id, 1, cheque.id, {
+      status: 'CLEARED',
+      clearedDate: '2026-11-06',
+      bounceFee: '0.00',
+    });
+
+    await expect(
+      paymentsService.voidPayment(org.id, 1, chequePayment.id, {
+        reason: 'Attempted void after clearance',
+      }),
+    ).rejects.toThrow(/already cleared/i);
+  });
 });

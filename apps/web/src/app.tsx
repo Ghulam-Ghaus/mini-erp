@@ -493,6 +493,7 @@ function RootApplication() {
       statusBanner={statusBadge}
       labels={{
         appName: displayOrgName,
+        developedBy: t('app.developedBy'),
         toggleSidebar: t('shell.toggleSidebar'),
         quickSearch: t('shell.quickSearch'),
         notifications: t('shell.notifications'),

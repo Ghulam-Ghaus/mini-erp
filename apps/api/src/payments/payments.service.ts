@@ -857,6 +857,11 @@ export class PaymentsService {
       if (existing.status === 'BOUNCED') {
         throw new BadRequestException('Cannot void a payment whose cheque has already bounced');
       }
+      if (existing.cheque?.status === 'CLEARED') {
+        throw new BadRequestException(
+          'Cannot void a payment whose cheque has already cleared at the bank',
+        );
+      }
 
       // Reverse allocations on purchase or sale invoices
       await this.reverseAllocationsInTx(tx, existing.allocations);

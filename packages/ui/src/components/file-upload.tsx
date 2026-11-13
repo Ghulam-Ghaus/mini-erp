@@ -1,6 +1,7 @@
-import { ImagePlus, Trash2 } from 'lucide-react';
-import { useRef, useState, type ChangeEvent } from 'react';
+import { FileText, ImagePlus, Trash2, ZoomIn } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Button } from './button.js';
+import { ProofViewerDialog } from './proof-viewer-dialog.js';
 
 export interface FileUploadProps {
   readonly id?: string;
@@ -30,11 +31,18 @@ export function FileUpload({
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (localPreview) URL.revokeObjectURL(localPreview);
+    };
+  }, [localPreview]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     if (localPreview) URL.revokeObjectURL(localPreview);
-    if (file && file.type.startsWith('image/')) {
+    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
       setLocalPreview(URL.createObjectURL(file));
     } else {
       setLocalPreview(null);
@@ -50,6 +58,10 @@ export function FileUpload({
   };
 
   const preview = localPreview ?? externalPreview ?? null;
+  const isPdf =
+    value?.type === 'application/pdf' ||
+    Boolean(value?.name.toLowerCase().endsWith('.pdf')) ||
+    Boolean(preview?.toLowerCase().startsWith('data:application/pdf'));
 
   return (
     <div
@@ -67,11 +79,27 @@ export function FileUpload({
       />
       <div className="flex items-center gap-3 overflow-hidden">
         {preview ? (
-          <img
-            src={preview}
-            alt={value?.name ?? 'Preview'}
-            className="h-10 w-10 shrink-0 rounded border border-[#d6d3c9] object-cover"
-          />
+          <button
+            type="button"
+            onClick={() => setViewerOpen(true)}
+            title={value?.name ?? 'View'}
+            className="group relative h-10 w-10 shrink-0 overflow-hidden rounded border border-[#d6d3c9] bg-white cursor-pointer"
+          >
+            {isPdf ? (
+              <div className="flex h-full w-full items-center justify-center text-[#9e3b33]">
+                <FileText className="h-4 w-4" />
+              </div>
+            ) : (
+              <img
+                src={preview}
+                alt={value?.name ?? 'Preview'}
+                className="h-full w-full object-cover"
+              />
+            )}
+            <span className="absolute inset-0 flex items-center justify-center bg-black/35 text-white opacity-0 transition-opacity group-hover:opacity-100">
+              <ZoomIn className="h-3.5 w-3.5" />
+            </span>
+          </button>
         ) : (
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-dashed border-[#d6d3c9] bg-white text-[#8c8980]">
             <ImagePlus className="h-4 w-4" />
@@ -85,6 +113,14 @@ export function FileUpload({
           )}
         </div>
       </div>
+
+      <ProofViewerDialog
+        open={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        fileUrl={preview}
+        fileName={value?.name ?? 'proof'}
+        mimeType={value?.type}
+      />
 
       <div className="flex shrink-0 items-center gap-1.5">
         <Button variant="secondary" size="sm" onClick={() => inputRef.current?.click()}>

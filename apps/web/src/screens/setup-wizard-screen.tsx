@@ -127,6 +127,7 @@ export function SetupWizardScreen({
       languageLabel={t('shell.languageToggle')}
       onToggleLanguage={onToggleLanguage}
       statusBadge={statusBadge}
+      footerText={t('app.developedBy')}
       maxWidthClass="max-w-2xl"
     >
       <SurfaceCard

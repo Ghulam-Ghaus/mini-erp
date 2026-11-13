@@ -67,7 +67,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
     date: '2026-11-01',
     client: 'Gohar Traders',
     batch: 'Batch 1',
-    item: 'name',
+    item: 'Item A',
     qtyKg: '100.000',
     costRate: '68.75',
     saleRate: '80.00',
@@ -81,7 +81,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
     date: '2026-11-02',
     client: 'Al-Madina Store',
     batch: 'Batch 1',
-    item: 'name',
+    item: 'Item A',
     qtyKg: '250.000',
     costRate: '68.75',
     saleRate: '82.00',
@@ -95,7 +95,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
     date: '2026-11-03',
     client: 'Client Business name',
     batch: 'Batch 2',
-    item: 'Daal Masoor',
+    item: 'Item B',
     qtyKg: '150.500',
     costRate: '95.00',
     saleRate: '110.00',
@@ -109,7 +109,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
     date: '2026-11-04',
     client: 'Saddar Wholesale',
     batch: 'Batch 2',
-    item: 'Daal Masoor',
+    item: 'Item B',
     qtyKg: '80.000',
     costRate: '95.00',
     saleRate: '92.00',
@@ -123,7 +123,7 @@ const INITIAL_DEMO_ROWS: readonly DemoSaleRow[] = [
     date: '2026-11-05',
     client: 'Gohar Traders',
     batch: 'Batch 3',
-    item: 'Daal Moong',
+    item: 'Item C',
     qtyKg: '300.000',
     costRate: '120.00',
     saleRate: '138.50',
@@ -147,9 +147,9 @@ const ROUTE_OPTIONS = [
 ] as const;
 
 const BATCH_COSTS: Record<string, { readonly item: string; readonly costRate: string }> = {
-  'Batch 1': { item: 'name', costRate: '68.75' },
-  'Batch 2': { item: 'Daal Masoor', costRate: '95.00' },
-  'Batch 3': { item: 'Daal Moong', costRate: '120.00' },
+  'Batch 1': { item: 'Item A', costRate: '68.75' },
+  'Batch 2': { item: 'Item B', costRate: '95.00' },
+  'Batch 3': { item: 'Item C', costRate: '120.00' },
 };
 
 const statusToneMap: Record<DemoSaleRow['status'], StatusTone> = {

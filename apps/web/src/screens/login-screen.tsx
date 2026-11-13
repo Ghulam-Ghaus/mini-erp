@@ -66,6 +66,7 @@ export function LoginScreen({ statusBadge, onToggleLanguage, onLoggedIn }: Login
       languageLabel={t('shell.languageToggle')}
       onToggleLanguage={onToggleLanguage}
       statusBadge={statusBadge}
+      footerText={t('app.developedBy')}
       maxWidthClass="max-w-sm"
     >
       <SurfaceCard title={t('auth.loginTitle')} subtitle={t('auth.loginSubtitle')}>
@@ -169,6 +170,7 @@ export function LockScreen({
       languageLabel={t('shell.languageToggle')}
       onToggleLanguage={onToggleLanguage}
       statusBadge={statusBadge}
+      footerText={t('app.developedBy')}
       maxWidthClass="max-w-sm"
     >
       <SurfaceCard title={t('auth.lockTitle')} subtitle={t('auth.lockSubtitle', { username })}>

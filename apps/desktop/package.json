@@ -1,6 +1,8 @@
 {
   "name": "@mini-erp/desktop",
   "version": "0.1.0",
+  "description": "Mini ERP — Batch Trading & Recovery Desktop Application",
+  "author": "GG IT Solutions",
   "private": true,
   "type": "module",
   "main": "dist/main.js",

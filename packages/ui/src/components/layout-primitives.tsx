@@ -174,6 +174,7 @@ export interface AuthScreenLayoutProps {
   readonly languageLabel: string;
   readonly onToggleLanguage: () => void;
   readonly statusBadge?: ReactNode;
+  readonly footerText?: string;
   readonly maxWidthClass?: string;
   readonly children: ReactNode;
 }
@@ -187,6 +188,7 @@ export function AuthScreenLayout({
   languageLabel,
   onToggleLanguage,
   statusBadge,
+  footerText,
   maxWidthClass = 'max-w-md',
   children,
 }: AuthScreenLayoutProps) {
@@ -211,6 +213,9 @@ export function AuthScreenLayout({
       <main className="flex flex-1 items-center justify-center p-5">
         <div className={`w-full ${maxWidthClass}`}>{children}</div>
       </main>
+      {footerText && (
+        <footer className="py-3 text-center text-[11px] text-[#8c8980]">{footerText}</footer>
+      )}
     </div>
   );
 }

@@ -1305,7 +1305,7 @@ export function BatchesScreen({
             <TextInput
               value={batchName}
               onChange={(e) => setBatchName(e.target.value)}
-              placeholder="e.g. name — Lot 01"
+              placeholder="e.g. Product A — Lot 01"
             />
           </FormField>
 
@@ -1315,7 +1315,7 @@ export function BatchesScreen({
               className="font-urdu"
               value={batchNameUr}
               onChange={(e) => setBatchNameUr(e.target.value)}
-              placeholder="دال چنا — لاٹ 01"
+              placeholder="پروڈکٹ اے — لاٹ 01"
             />
           </FormField>
 

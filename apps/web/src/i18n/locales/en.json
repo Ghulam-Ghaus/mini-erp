@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "Mini ERP",
-    "tagline": "Batch trading and recovery"
+    "tagline": "Batch trading and recovery",
+    "developedBy": "Developed by GG IT Solutions"
   },
   "health": {
     "checking": "Connecting to local server…",
@@ -88,6 +89,8 @@
     "lastPage": "Last page",
     "actions": "Actions",
     "view": "View",
+    "download": "Download",
+    "close": "Close",
     "void": "Void",
     "status": "Status",
     "notes": "Notes",
@@ -288,7 +291,7 @@
     "searchPlaceholder": "Search item name, Urdu name, code, or category…",
     "allStatuses": "All Statuses",
     "emptyTitle": "No items found",
-    "emptyDescription": "Create your first trading item (e.g. name, Daal Moong) with its base unit and bag conversion.",
+    "emptyDescription": "Create your first trading item (e.g. Product A) with its base unit and packaging conversion.",
     "colId": "#",
     "colCode": "Code",
     "colName": "Item Name",

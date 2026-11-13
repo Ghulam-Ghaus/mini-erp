@@ -25,6 +25,8 @@ import {
   NumberInput,
   PageHeader,
   Pagination,
+  ProofThumbnailCard,
+  ProofViewerDialog,
   RowActions,
   Select,
   StatusBadge,
@@ -178,6 +180,11 @@ export function PaymentsChequesScreen({
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentDto | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [printDoc, setPrintDoc] = useState<PrintableDocument | null>(null);
+  const [viewerProof, setViewerProof] = useState<{
+    fileUrl: string;
+    fileName: string;
+    mimeType?: string;
+  } | null>(null);
 
   // --- Tab 2: Cheques Register state ---
   const [chequeSearch, setChequeSearch] = useState('');
@@ -1335,11 +1342,19 @@ export function PaymentsChequesScreen({
               <SurfaceCard title={t('payments.proofUpload')}>
                 <div className="flex flex-wrap gap-3">
                   {selectedReceipt.attachments.map((att) => (
-                    <img
+                    <ProofThumbnailCard
                       key={att.id}
-                      src={att.filePath}
-                      alt={att.fileName}
-                      className="max-h-48 rounded border border-[#d6d3c9] object-contain"
+                      fileUrl={att.filePath}
+                      fileName={att.fileName}
+                      mimeType={att.mimeType}
+                      viewLabel={t('common.view')}
+                      onClick={() =>
+                        setViewerProof({
+                          fileUrl: att.filePath,
+                          fileName: att.fileName,
+                          mimeType: att.mimeType,
+                        })
+                      }
                     />
                   ))}
                 </div>
@@ -1498,6 +1513,16 @@ export function PaymentsChequesScreen({
         open={Boolean(printDoc)}
         document={printDoc}
         onClose={() => setPrintDoc(null)}
+      />
+
+      <ProofViewerDialog
+        open={Boolean(viewerProof)}
+        onClose={() => setViewerProof(null)}
+        fileUrl={viewerProof?.fileUrl ?? null}
+        fileName={viewerProof?.fileName}
+        mimeType={viewerProof?.mimeType}
+        title={t('payments.proofUpload')}
+        labels={{ close: t('common.close'), download: t('common.download') }}
       />
     </div>
   );

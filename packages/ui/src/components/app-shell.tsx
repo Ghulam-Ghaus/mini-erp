@@ -40,6 +40,7 @@ export interface AppShellUser {
 
 export interface AppShellLabels {
   readonly appName: string;
+  readonly developedBy?: string;
   readonly toggleSidebar: string;
   readonly quickSearch: string;
   readonly notifications: string;
@@ -330,6 +331,12 @@ export function AppShell({
                 <LogOut className="h-3.5 w-3.5" />
                 <span>{labels.userMenu.logout}</span>
               </button>
+            </div>
+          )}
+
+          {!collapsed && labels.developedBy && (
+            <div className="mt-1.5 truncate border-t border-[#e0ddd4] pt-1.5 text-center text-[10px] text-[#7a7870]">
+              {labels.developedBy}
             </div>
           )}
         </div>
